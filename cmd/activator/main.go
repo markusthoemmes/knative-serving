@@ -18,10 +18,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/knative/pkg/logging/logkey"
 
 	"github.com/knative/pkg/configmap"
@@ -50,6 +52,43 @@ const (
 	exponentialBackoffBase = 1.3
 )
 
+var (
+	logger   *zap.SugaredLogger
+	statSink *websocket.Conn
+)
+
+func connectStatSink() {
+	autoscalerEndpoint := fmt.Sprintf("ws://%s.%s.svc.cluster.local:%s",
+		system.Autoscaler, system.Namespace, "8080")
+	logger.Infof("Connecting to autoscaler at %s.", autoscalerEndpoint)
+	for {
+		// TODO: use exponential backoff here
+		time.Sleep(time.Second)
+
+		dialer := &websocket.Dialer{
+			HandshakeTimeout: 3 * time.Second,
+		}
+		conn, _, err := dialer.Dial(autoscalerEndpoint, nil)
+		if err != nil {
+			logger.Error("Retrying connection to autoscaler.", zap.Error(err))
+		} else {
+			logger.Info("Connected to stat sink.")
+			statSink = conn
+			waitForClose(conn)
+		}
+	}
+}
+
+func waitForClose(c *websocket.Conn) {
+	for {
+		if _, _, err := c.NextReader(); err != nil {
+			logger.Error("Error reading from websocket", zap.Error(err))
+			c.Close()
+			return
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	cm, err := configmap.Load("/etc/config-logging")
@@ -60,9 +99,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error parsing logging configuration: %v", err)
 	}
-	logger, atomicLevel := logging.NewLoggerFromConfig(config, logLevelKey)
+	createdLogger, atomicLevel := logging.NewLoggerFromConfig(config, logLevelKey)
 	defer logger.Sync()
-	logger = logger.With(zap.String(logkey.ControllerType, "activator"))
+	logger = createdLogger.With(zap.String(logkey.ControllerType, "activator"))
 	logger.Info("Starting the knative activator")
 
 	clusterConfig, err := rest.InClusterConfig()
@@ -90,6 +129,8 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to create stats reporter: %v", zap.Error(err))
 	}
+
+	go connectStatSink()
 
 	a := activator.NewRevisionActivator(kubeClient, servingClient, logger, reporter)
 	a = activator.NewDedupingActivator(a)

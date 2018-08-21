@@ -20,4 +20,7 @@ const (
 	// Namespace holds the K8s namespace where our serving system
 	// components run.
 	Namespace = "knative-serving"
+
+	// Autoscaler holds the K8s service to reach the autoscaler.
+	Autoscaler = "autoscaler"
 )
