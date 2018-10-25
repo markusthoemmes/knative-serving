@@ -24,8 +24,8 @@ Ten substantial examples with Markus as primary reviewer:
 4. [Activator Header Fixes](https://github.com/knative/serving/pull/2047) Pointed out missing documentation and reviewed the whole thing.
 5. [Amortize pod metrics when lameducking](https://github.com/knative/serving/pull/2109) Questioned the design, got convinced, reviewed the whole thing and proposed accepted changes
 6. [Fix race condition in breaker test (#1984)](https://github.com/knative/serving/pull/2137) (Clarified some bits and lgtmed)
-7. 
-8. 
+7. [Bump the activator to 3 replicas to test horizontal scalability.](https://github.com/knative/serving/pull/2171) (A small PR but with wide ranging effects. Identified and fixed issues not directly visible in the code diff)
+8. [Avoid emitting headers that later reject requests](https://github.com/knative/serving/pull/2240) (Discussed about the implementation, suggested improvements)
 9. 
 10. 
 
