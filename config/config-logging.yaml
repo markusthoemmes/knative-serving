@@ -52,3 +52,38 @@ data:
   loglevel.queueproxy: "info"
   loglevel.webhook: "info"
   loglevel.activator: "info"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-logging
+  namespace: knative-networking
+data:
+  # Common configuration for all Knative codebase
+  zap-logger-config: |
+    {
+      "level": "info",
+      "development": false,
+      "outputPaths": ["stdout"],
+      "errorOutputPaths": ["stderr"],
+      "encoding": "json",
+      "encoderConfig": {
+        "timeKey": "ts",
+        "levelKey": "level",
+        "nameKey": "logger",
+        "callerKey": "caller",
+        "messageKey": "msg",
+        "stacktraceKey": "stacktrace",
+        "lineEnding": "",
+        "levelEncoder": "",
+        "timeEncoder": "iso8601",
+        "durationEncoder": "",
+        "callerEncoder": ""
+      }
+    }
+  
+  # Log level overrides
+  # For all components except the autoscaler and queue proxy, 
+  # changes are be picked up immediately.
+  # For autoscaler and queue proxy, changes require recreation of the pods.
+  loglevel.controller-clusteringress-istio: "info"

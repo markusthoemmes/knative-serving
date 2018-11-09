@@ -13,17 +13,8 @@
 # limitations under the License.
 
 apiVersion: v1
-kind: ServiceAccount
+kind: Namespace
 metadata:
-  name: controller
-  namespace: knative-serving
+  name: knative-networking
   labels:
-    serving.knative.dev/release: devel
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: controller
-  namespace: knative-networking
-  labels:
-    serving.knative.dev/release: devel
+    istio-injection: enabled

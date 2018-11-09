@@ -44,7 +44,6 @@ import (
 	"github.com/knative/serving/pkg/logging"
 	"github.com/knative/serving/pkg/metrics"
 	"github.com/knative/serving/pkg/reconciler"
-	"github.com/knative/serving/pkg/reconciler/v1alpha1/clusteringress"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/configuration"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/labeler"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/revision"
@@ -148,7 +147,6 @@ func main() {
 	coreServiceInformer := kubeInformerFactory.Core().V1().Services()
 	endpointsInformer := kubeInformerFactory.Core().V1().Endpoints()
 	configMapInformer := kubeInformerFactory.Core().V1().ConfigMaps()
-	virtualServiceInformer := sharedInformerFactory.Networking().V1alpha3().VirtualServices()
 	imageInformer := cachingInformerFactory.Caching().V1alpha1().Images()
 
 	// Build all of our controllers, with the clients constructed above.
@@ -190,11 +188,6 @@ func main() {
 			configurationInformer,
 			routeInformer,
 		),
-		clusteringress.NewController(
-			opt,
-			clusterIngressInformer,
-			virtualServiceInformer,
-		),
 	}
 
 	// Watch the logging config map and dynamically update logging levels.
@@ -219,13 +212,11 @@ func main() {
 		configurationInformer.Informer().HasSynced,
 		revisionInformer.Informer().HasSynced,
 		kpaInformer.Informer().HasSynced,
-		clusterIngressInformer.Informer().HasSynced,
 		imageInformer.Informer().HasSynced,
 		deploymentInformer.Informer().HasSynced,
 		coreServiceInformer.Informer().HasSynced,
 		endpointsInformer.Informer().HasSynced,
 		configMapInformer.Informer().HasSynced,
-		virtualServiceInformer.Informer().HasSynced,
 	} {
 		if ok := cache.WaitForCacheSync(stopCh, synced); !ok {
 			logger.Fatalf("Failed to wait for cache at index %d to sync", i)
