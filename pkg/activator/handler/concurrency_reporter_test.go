@@ -17,6 +17,7 @@ limitations under the License.
 package handler
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -24,97 +25,291 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/knative/serving/pkg/autoscaler"
+	"github.com/knative/serving/pkg/system"
 )
 
-func TestMultipleDifferentKeys(t *testing.T) {
+const (
+	requestOpTick  = "RequestOpTick"
+	requestOpStart = "RequestOpStart"
+	requestOpEnd   = "RequestOpEnd"
+)
 
-	pod1 := "pod1"
-	pod2 := "pod2"
+type fakeClock struct {
+	Time time.Time
+}
 
-	s := newTestStats()
+func (c fakeClock) Now() time.Time {
+	return c.Time
+}
 
-	s.requestStart(pod1)
-	s.requestStart(pod1)
-	s.requestStart(pod2)
+type reqOp struct {
+	op   string
+	key  string
+	time time.Time
+}
 
-	now := time.Now()
-	expectStats(t, s.report(now, 2), []*autoscaler.StatMessage{{
-		Key: pod1,
-		Stat: autoscaler.Stat{
-			Time:                      &now,
-			PodName:                   autoscaler.ActivatorPodName,
-			AverageConcurrentRequests: 2.0,
-			RequestCount:              2,
+func TestStats(t *testing.T) {
+	tt := []struct {
+		name          string
+		ops           []reqOp
+		expectedStats []*autoscaler.StatMessage
+	}{
+		{
+			name: "Scale-from-zero sends stat",
+			ops: []reqOp{
+				{
+					op:  requestOpStart,
+					key: "pod1",
+				},
+				{
+					op:  requestOpStart,
+					key: "pod2",
+				},
+			},
+			expectedStats: []*autoscaler.StatMessage{
+				{
+					Key: "pod1",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod2",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+			},
 		},
-	}, {
-		Key: pod2,
-		Stat: autoscaler.Stat{
-			Time:                      &now,
-			PodName:                   autoscaler.ActivatorPodName,
-			AverageConcurrentRequests: 1.0,
-			RequestCount:              1,
+		{
+			name: "Scale-from-zero after tick sends stat",
+			ops: []reqOp{
+				{
+					op:  requestOpStart,
+					key: "pod1",
+				},
+				{
+					op:  requestOpEnd,
+					key: "pod1",
+				},
+				{
+					op: requestOpTick,
+				},
+				{
+					op:  requestOpStart,
+					key: "pod1",
+				},
+			},
+			expectedStats: []*autoscaler.StatMessage{
+				{
+					Key: "pod1",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod1",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+			},
 		},
-	}})
-
-	s.requestEnd(pod2)
-	s.requestEnd(pod1)
-
-	now = time.Now()
-	expectStats(t, s.report(now, 1), []*autoscaler.StatMessage{{
-		Key: pod1,
-		Stat: autoscaler.Stat{
-			Time:                      &now,
-			PodName:                   autoscaler.ActivatorPodName,
-			AverageConcurrentRequests: 1.0,
-			RequestCount:              0, // no new request arrived after reporting
+		{
+			name: "Multiple pods tick",
+			ops: []reqOp{
+				{
+					op:  requestOpStart,
+					key: "pod1",
+				},
+				{
+					op:  requestOpStart,
+					key: "pod2",
+				},
+				{
+					op: requestOpTick,
+				},
+				{
+					op:  requestOpEnd,
+					key: "pod1",
+				},
+				{
+					op:  requestOpStart,
+					key: "pod3",
+				},
+				{
+					op: requestOpTick,
+				},
+			},
+			expectedStats: []*autoscaler.StatMessage{
+				{
+					Key: "pod1",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod2",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod1",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod2",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod3",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod2",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              0,
+						PodName:                   "activator",
+					},
+				},
+				{
+					Key: "pod3",
+					Stat: autoscaler.Stat{
+						Time:                      &time.Time{},
+						AverageConcurrentRequests: 1,
+						RequestCount:              1,
+						PodName:                   "activator",
+					},
+				},
+			},
 		},
-	}})
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			writeDone := make(chan struct{})
+			writeWg := sync.WaitGroup{}
+			writeWg.Add(1)
+			s, cr := newTestStats(fakeClock{})
+			go func() {
+				cr.Run(writeDone)
+				writeWg.Done()
+			}()
+
+			readDone := make(chan struct{})
+			readWg := sync.WaitGroup{}
+			readWg.Add(1)
+
+			stats := make([]*autoscaler.StatMessage, 0)
+			// read off stats and save them to stats array
+			go func() {
+				defer readWg.Done()
+				for {
+					select {
+					case sm := <-s.statChan:
+						stats = append(stats, sm)
+					case <-readDone:
+						return
+					}
+				}
+			}()
+
+			// Apply request operations
+			for _, op := range tc.ops {
+				if op.op == requestOpStart {
+					s.requestStart(op.key)
+				} else if op.op == requestOpEnd {
+					s.requestEnd(op.key)
+				} else if op.op == requestOpTick {
+					s.reportBiChan <- op.time
+				}
+			}
+
+			close(writeDone)
+			writeWg.Wait()
+			close(readDone)
+			readWg.Wait()
+
+			// Wait until the number of stats we expect have been reported
+			for {
+				if len(stats) < len(tc.expectedStats) {
+					time.Sleep(100 * time.Millisecond)
+				} else {
+					break
+				}
+			}
+
+			// Check the stats we got match what we wanted
+			sorter := cmpopts.SortSlices(func(a, b *autoscaler.StatMessage) bool {
+				return a.Key < b.Key
+			})
+			if diff := cmp.Diff(tc.expectedStats, stats, sorter); diff != "" {
+				t.Errorf("Unexpected stats (-want +got): %v", diff)
+			}
+		})
+	}
 }
 
 // Test type to hold the bi-directional time channels
 type testStats struct {
-	channels     Channels
+	reqChan      chan ReqEvent
+	reportChan   <-chan time.Time
+	statChan     chan *autoscaler.StatMessage
 	reportBiChan chan time.Time
 }
 
-func newTestStats() *testStats {
+func newTestStats(clock system.Clock) (*testStats, *ConcurrencyReporter) {
 	reportBiChan := make(chan time.Time)
-	ch := Channels{
-		ReqChan:    make(chan ReqEvent),
-		ReportChan: (<-chan time.Time)(reportBiChan),
-		StatChan:   make(chan *autoscaler.StatMessage),
-	}
-	NewConcurrencyReporter(autoscaler.ActivatorPodName, ch)
 	t := &testStats{
-		channels:     ch,
+		reqChan:      make(chan ReqEvent),
+		reportChan:   (<-chan time.Time)(reportBiChan),
+		statChan:     make(chan *autoscaler.StatMessage),
 		reportBiChan: reportBiChan,
 	}
-	return t
+	cr := NewConcurrencyReporterWithClock(autoscaler.ActivatorPodName, t.reqChan, t.reportChan, t.statChan, clock)
+	return t, cr
 }
 
 func (s *testStats) requestStart(key string) {
-	s.channels.ReqChan <- ReqEvent{Key: key, EventType: ReqIn}
+	s.reqChan <- ReqEvent{Key: key, EventType: ReqIn}
 }
 
 func (s *testStats) requestEnd(key string) {
-	s.channels.ReqChan <- ReqEvent{Key: key, EventType: ReqOut}
-}
-
-func (s *testStats) report(t time.Time, count int) []*autoscaler.StatMessage {
-	s.reportBiChan <- t
-	metrics := make([]*autoscaler.StatMessage, count)
-	for i := 0; i < count; i++ {
-		metrics[i] = <-s.channels.StatChan
-	}
-	return metrics
-}
-
-func expectStats(t *testing.T, gots, wants []*autoscaler.StatMessage) {
-	// Sort the stats to guarantee a given order
-	sorter := cmpopts.SortSlices(func(a, b *autoscaler.StatMessage) bool {
-		return a.Key < b.Key
-	})
-	if diff := cmp.Diff(wants, gots, sorter); diff != "" {
-		t.Errorf("Unexpected stats (-want +got): %v", diff)
-	}
+	s.reqChan <- ReqEvent{Key: key, EventType: ReqOut}
 }
