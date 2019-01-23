@@ -52,173 +52,140 @@ func TestStats(t *testing.T) {
 		name          string
 		ops           []reqOp
 		expectedStats []*autoscaler.StatMessage
-	}{
-		{
-			name: "Scale-from-zero sends stat",
-			ops: []reqOp{
-				{
-					op:  requestOpStart,
-					key: "pod1",
-				},
-				{
-					op:  requestOpStart,
-					key: "pod2",
-				},
+	}{{
+		name: "Scale-from-zero sends stat",
+		ops: []reqOp{{
+			op:  requestOpStart,
+			key: "pod1",
+		}, {
+			op:  requestOpStart,
+			key: "pod2",
+		}},
+		expectedStats: []*autoscaler.StatMessage{{
+			Key: "pod1",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-			expectedStats: []*autoscaler.StatMessage{
-				{
-					Key: "pod1",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod2",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
+		}, {
+			Key: "pod2",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-		},
-		{
-			name: "Scale-from-zero after tick sends stat",
-			ops: []reqOp{
-				{
-					op:  requestOpStart,
-					key: "pod1",
-				},
-				{
-					op:  requestOpEnd,
-					key: "pod1",
-				},
-				{
-					op: requestOpTick,
-				},
-				{
-					op:  requestOpStart,
-					key: "pod1",
-				},
+		}},
+	}, {
+		name: "Scale-from-zero after tick sends stat",
+		ops: []reqOp{{
+			op:  requestOpStart,
+			key: "pod1",
+		}, {
+			op:  requestOpEnd,
+			key: "pod1",
+		}, {
+			op: requestOpTick,
+		}, {
+			op:  requestOpStart,
+			key: "pod1",
+		}},
+		expectedStats: []*autoscaler.StatMessage{{
+			Key: "pod1",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-			expectedStats: []*autoscaler.StatMessage{
-				{
-					Key: "pod1",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod1",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
+		}, {
+			Key: "pod1",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-		},
-		{
-			name: "Multiple pods tick",
-			ops: []reqOp{
-				{
-					op:  requestOpStart,
-					key: "pod1",
-				},
-				{
-					op:  requestOpStart,
-					key: "pod2",
-				},
-				{
-					op: requestOpTick,
-				},
-				{
-					op:  requestOpEnd,
-					key: "pod1",
-				},
-				{
-					op:  requestOpStart,
-					key: "pod3",
-				},
-				{
-					op: requestOpTick,
-				},
+		}},
+	}, {
+		name: "Multiple pods tick",
+		ops: []reqOp{{
+			op:  requestOpStart,
+			key: "pod1",
+		}, {
+			op:  requestOpStart,
+			key: "pod2",
+		}, {
+			op: requestOpTick,
+		}, {
+			op:  requestOpEnd,
+			key: "pod1",
+		}, {
+			op:  requestOpStart,
+			key: "pod3",
+		}, {
+			op: requestOpTick,
+		}},
+		expectedStats: []*autoscaler.StatMessage{{
+			Key: "pod1",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-			expectedStats: []*autoscaler.StatMessage{
-				{
-					Key: "pod1",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod2",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod1",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod2",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod3",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod2",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              0,
-						PodName:                   "activator",
-					},
-				},
-				{
-					Key: "pod3",
-					Stat: autoscaler.Stat{
-						Time:                      &time.Time{},
-						AverageConcurrentRequests: 1,
-						RequestCount:              1,
-						PodName:                   "activator",
-					},
-				},
+		}, {
+			Key: "pod2",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
 			},
-		},
-	}
+		}, {
+			Key: "pod1",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
+			},
+		}, {
+			Key: "pod2",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
+			},
+		}, {
+			Key: "pod3",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
+			},
+		}, {
+			Key: "pod2",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              0,
+				PodName:                   "activator",
+			},
+		}, {
+			Key: "pod3",
+			Stat: autoscaler.Stat{
+				Time:                      &time.Time{},
+				AverageConcurrentRequests: 1,
+				RequestCount:              1,
+				PodName:                   "activator",
+			},
+		}},
+	}}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
