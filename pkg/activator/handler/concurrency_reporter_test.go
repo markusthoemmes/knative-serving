@@ -17,7 +17,6 @@ limitations under the License.
 package handler
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -224,55 +223,30 @@ func TestStats(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			writeDone := make(chan struct{})
-			writeWg := sync.WaitGroup{}
-			writeWg.Add(1)
+			defer close(writeDone)
+
 			s, cr := newTestStats(fakeClock{})
 			go func() {
 				cr.Run(writeDone)
-				writeWg.Done()
-			}()
-
-			readDone := make(chan struct{})
-			readWg := sync.WaitGroup{}
-			readWg.Add(1)
-
-			stats := make([]*autoscaler.StatMessage, 0)
-			// read off stats and save them to stats array
-			go func() {
-				defer readWg.Done()
-				for {
-					select {
-					case sm := <-s.statChan:
-						stats = append(stats, sm)
-					case <-readDone:
-						return
-					}
-				}
 			}()
 
 			// Apply request operations
 			for _, op := range tc.ops {
-				if op.op == requestOpStart {
-					s.requestStart(op.key)
-				} else if op.op == requestOpEnd {
-					s.requestEnd(op.key)
-				} else if op.op == requestOpTick {
+				switch op.op {
+				case requestOpStart:
+					s.reqChan <- ReqEvent{Key: op.key, EventType: ReqIn}
+				case requestOpEnd:
+					s.reqChan <- ReqEvent{Key: op.key, EventType: ReqOut}
+				case requestOpTick:
 					s.reportBiChan <- op.time
 				}
 			}
 
-			close(writeDone)
-			writeWg.Wait()
-			close(readDone)
-			readWg.Wait()
-
+			stats := make([]*autoscaler.StatMessage, 0)
 			// Wait until the number of stats we expect have been reported
-			for {
-				if len(stats) < len(tc.expectedStats) {
-					time.Sleep(100 * time.Millisecond)
-				} else {
-					break
-				}
+			for i := 0; i < len(tc.expectedStats); i++ {
+				sm := <-s.statChan
+				stats = append(stats, sm)
 			}
 
 			// Check the stats we got match what we wanted
@@ -299,17 +273,9 @@ func newTestStats(clock system.Clock) (*testStats, *ConcurrencyReporter) {
 	t := &testStats{
 		reqChan:      make(chan ReqEvent),
 		reportChan:   (<-chan time.Time)(reportBiChan),
-		statChan:     make(chan *autoscaler.StatMessage),
+		statChan:     make(chan *autoscaler.StatMessage, 20),
 		reportBiChan: reportBiChan,
 	}
 	cr := NewConcurrencyReporterWithClock(autoscaler.ActivatorPodName, t.reqChan, t.reportChan, t.statChan, clock)
 	return t, cr
-}
-
-func (s *testStats) requestStart(key string) {
-	s.reqChan <- ReqEvent{Key: key, EventType: ReqIn}
-}
-
-func (s *testStats) requestEnd(key string) {
-	s.reqChan <- ReqEvent{Key: key, EventType: ReqOut}
 }
