@@ -29,11 +29,11 @@ source $(dirname $0)/cluster.sh
 
 # Helper functions.
 function dump_app_logs() {
-  echo ">>> Knative Serving $1 logs:"
-  for pod in $(get_app_pods "$1" knative-serving)
+  echo ">>> Knative Serving $2/$1 logs:"
+  for pod in $(get_app_pods "$1" "$2")
   do
     echo ">>> Pod: $pod"
-    kubectl -n knative-serving logs "$pod" -c "$1"
+    kubectl -n "$2" logs "$pod" -c "$1"
   done
 }
 
@@ -45,10 +45,11 @@ function dump_extra_cluster_state() {
   echo ">>> Revisions:"
   kubectl get revisions -o yaml --all-namespaces
 
-  dump_app_logs controller
-  dump_app_logs webhook
-  dump_app_logs autoscaler
-  dump_app_logs activator
+  dump_app_logs controller knative-serving
+  dump_app_logs webhook knative-serving
+  dump_app_logs autoscaler knative-serving
+  dump_app_logs activator knative-serving
+  dump_app_logs clusteringress-controller knative-networking
 }
 
 # Deletes everything created on the cluster including all knative and istio components.
