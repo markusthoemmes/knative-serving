@@ -165,6 +165,11 @@ func isProbe(r *http.Request) bool {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get(queue.QueueProbeHeader) != "" {
+		w.Write([]byte("queue"))
+		return
+	}
+
 	proxy := proxyForRequest(r)
 
 	if isProbe(r) {
@@ -298,7 +303,11 @@ func main() {
 
 	server = h2c.NewServer(
 		fmt.Sprintf(":%d", v1alpha1.RequestQueuePort),
-		queue.TimeToFirstByteTimeoutHandler(http.HandlerFunc(handler), time.Duration(revisionTimeoutSeconds)*time.Second, "request timeout"))
+		autoscaler.ProbingHandler(
+			queue.TimeToFirstByteTimeoutHandler(http.HandlerFunc(handler), time.Duration(revisionTimeoutSeconds)*time.Second, "request timeout"),
+			queue.QueueProbeHeader, "queue",
+			),
+		)
 
 	errChan := make(chan error, 2)
 	// Runs a server created by creator and sends fatal errors to the errChan.

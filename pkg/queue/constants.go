@@ -28,4 +28,7 @@ const (
 	// RequestQueueHealthPath specifies the path for health checks for
 	// queue-proxy.
 	RequestQueueHealthPath = "/health"
+
+	// QueueProbeHeader is the header key for special requests to determine that the queue proxy is present
+	QueueProbeHeader string = "knative-queue-probe"
 )
