@@ -165,11 +165,6 @@ func isProbe(r *http.Request) bool {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(queue.QueueProbeHeader) != "" {
-		w.Write([]byte("queue"))
-		return
-	}
-
 	proxy := proxyForRequest(r)
 
 	if isProbe(r) {
