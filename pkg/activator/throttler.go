@@ -66,6 +66,7 @@ type Throttler struct {
 func (t *Throttler) Remove(rev RevisionID) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
+
 	delete(t.breakers, rev)
 }
 
@@ -73,7 +74,9 @@ func (t *Throttler) Remove(rev RevisionID) {
 func (t *Throttler) UpdateCapacity(rev RevisionID, size int32) error {
 	t.mux.Lock()
 	defer t.mux.Unlock()
-	_, err := t.updateCapacity(rev, size)
+
+	breaker, _ := t.getOrCreateBreaker(rev)
+	err := t.updateCapacity(breaker, rev, size)
 	return err
 }
 
@@ -81,34 +84,29 @@ func (t *Throttler) UpdateCapacity(rev RevisionID, size int32) error {
 // It create a new breaker and saves it into our bookkeeping if doesn't exist.
 // This is important for not loosing the update signals
 // that came before the requests reached the Activator's Handler.
-func (t *Throttler) updateCapacity(rev RevisionID, size int32) (breaker *queue.Breaker, err error) {
+func (t *Throttler) updateCapacity(breaker *queue.Breaker, rev RevisionID, size int32) error {
 	revision, exists, err := t.getRevision(rev)
 	if err != nil {
-		return breaker, err
+		return err
 	}
 	if !exists {
-		return breaker, fmt.Errorf("no revision was found for: %s", rev)
+		return fmt.Errorf("no revision was found for: %s", rev)
 	}
 	cc := int32(revision.Spec.ContainerConcurrency)
 	// The concurrency is unlimited, thus hand out as many tokens as we can in this breaker.
 	if cc == 0 {
 		cc = t.breakerParams.MaxConcurrency
 	}
-	breaker, ok := t.breakers[rev]
-	if !ok {
-		breaker = queue.NewBreaker(t.breakerParams)
-		t.breakers[rev] = breaker
-	}
 	delta := size*cc - breaker.Capacity()
 	// Do not update throttler's concurrency if the same number of endpoints is received
 	// or the number is negative.
 	if delta <= 0 {
-		return breaker, nil
+		return nil
 	}
 	if err := breaker.UpdateConcurrency(delta); err != nil {
-		return breaker, err
+		return err
 	}
-	return breaker, nil
+	return nil
 }
 
 // Try potentially registers a new breaker in our bookkeeping
@@ -116,10 +114,13 @@ func (t *Throttler) updateCapacity(rev RevisionID, size int32) (breaker *queue.B
 // It returns an error if either breaker doesn't have enough capacity,
 // or breaker's registration didn't succeed, e.g. getting endpoints or update capacity failed.
 func (t *Throttler) Try(rev RevisionID, function func()) error {
-	breaker, err := t.getOrCreateBreaker(rev)
-	if err != nil {
-		return err
+	breaker, existed := t.getOrCreateBreaker(rev)
+	if !existed {
+		if err := t.forceUpdateBreaker(breaker, rev); err != nil {
+			return err
+		}
 	}
+
 	if ok := breaker.Maybe(function); !ok {
 		return errors.New(OverloadMessage)
 	}
@@ -127,24 +128,30 @@ func (t *Throttler) Try(rev RevisionID, function func()) error {
 }
 
 // Get existing breaker or create a new one.
-// In the latter case fetch the endpoints and update the capacity of the newly created breaker.
-// This avoids a potential deadlock in case if we missed the updates from the Endpoints informer.
-// This could happen because of a restart of the Activator or when a new one is added as part of scale out.
-func (t *Throttler) getOrCreateBreaker(rev RevisionID) (breaker *queue.Breaker, err error) {
+func (t *Throttler) getOrCreateBreaker(rev RevisionID) (*queue.Breaker, bool) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
+
 	breaker, ok := t.breakers[rev]
 	if !ok {
-		size, err := t.getEndpoints(rev)
-		if err != nil {
-			return breaker, err
-		}
-		breaker, err = t.updateCapacity(rev, size)
-		if err != nil {
-			return breaker, err
-		}
+		breaker = queue.NewBreaker(t.breakerParams)
+		t.breakers[rev] = breaker
 	}
-	return breaker, err
+	return breaker, ok
+}
+
+// Force updates the breaker with the current state of endpoints.
+func (t *Throttler) forceUpdateBreaker(breaker *queue.Breaker, rev RevisionID) error {
+	size, err := t.getEndpoints(rev)
+	if err != nil {
+		return err
+	}
+
+	if err := t.updateCapacity(breaker, rev, size); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UpdateEndpoints is a handler function to be used by the Endpoints informer.
