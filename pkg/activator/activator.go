@@ -32,9 +32,6 @@ const (
 	ServicePortHTTP1 int32 = 80
 	// ServicePortHTTP1 is the port number for activating H2C revisions
 	ServicePortH2C int32 = 81
-
-	// ActivatorProbeHeader is the header key for special requests to determine that the activator is present
-	ActivatorProbeHeader string = "knative-activator-probe"
 )
 
 // Activator provides an active endpoint for a revision or an error and

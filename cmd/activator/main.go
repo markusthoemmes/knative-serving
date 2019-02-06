@@ -174,8 +174,7 @@ func main() {
 				},
 			},
 		),
-	},activator.ActivatorProbeHeader, "activator",
-	)
+	}, "activator")
 
 
 	// Watch the logging config map and dynamically update logging levels.

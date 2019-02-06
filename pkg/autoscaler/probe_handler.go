@@ -17,22 +17,25 @@ import (
 	"net/http"
 )
 
+const (
+	// ActivatorProbeHeader is the header key for special requests to determine that the activator is present
+	ActivatorProbeHeader string = "knative-activator-probe"
+)
+
 type probingHandler struct {
-nextHandler http.Handler
-header string
-response string
+	nextHandler http.Handler
+	response string
 }
 
-func ProbingHandler(h http.Handler, header string, response string) http.Handler {
+func ProbingHandler(h http.Handler, response string) http.Handler {
 	return &probingHandler{
 		nextHandler: h,
-		header: header,
 		response: response,
 	}
 }
 
 func (h *probingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(h.header) != "" {
+	if r.Header.Get(ActivatorProbeHeader) != "" {
 		w.Write([]byte(h.response))
 		return
 	}

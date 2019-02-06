@@ -300,8 +300,7 @@ func main() {
 		fmt.Sprintf(":%d", v1alpha1.RequestQueuePort),
 		autoscaler.ProbingHandler(
 			queue.TimeToFirstByteTimeoutHandler(http.HandlerFunc(handler), time.Duration(revisionTimeoutSeconds)*time.Second, "request timeout"),
-			queue.QueueProbeHeader, "queue",
-			),
+			"queue-proxy"),
 		)
 
 	errChan := make(chan error, 2)

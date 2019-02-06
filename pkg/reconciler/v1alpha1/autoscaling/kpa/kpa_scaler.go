@@ -19,6 +19,8 @@ package kpa
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"sync"
 
 	"github.com/knative/pkg/apis"
@@ -155,8 +157,28 @@ func (ks *kpaScaler) Scale(ctx context.Context, pa *pav1alpha1.PodAutoscaler, de
 			// Otherwise, scale down to 1 until the idle period elapses
 			desiredScale = 1
 		} else { // Active=False
-			// Don't scale-to-zero if the grace period hasn't elapsed
-			if !pa.Status.CanScaleToZero(config.ScaleToZeroGracePeriod) {
+			url := fmt.Sprintf("http://%s.%s", pa.Spec.ServiceName, pa.ObjectMeta.Namespace)
+			client := &http.Client{}
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
+			req.Header.Set("knative-activator-probe", "true")
+			resp, err := client.Do(req)
+
+			if err != nil {
+				logger.Errorf("Probe request to %s failed", url, zap.Error(err))
+				return desiredScale, err
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				return desiredScale, nil
+			}
+
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				logger.Errorf("Failed to read response from probe request to %s", url, err)
+				return desiredScale, nil
+			}
+
+			if string(body) == "queue-proxy" {
 				return desiredScale, nil
 			}
 		}
