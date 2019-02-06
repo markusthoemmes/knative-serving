@@ -158,6 +158,7 @@ func (ks *kpaScaler) Scale(ctx context.Context, pa *pav1alpha1.PodAutoscaler, de
 			desiredScale = 1
 		} else { // Active=False
 			url := fmt.Sprintf("http://%s.%s", pa.Spec.ServiceName, pa.ObjectMeta.Namespace)
+			logger.Infof("Probing %s", url)
 			client := &http.Client{}
 			req, _ := http.NewRequest(http.MethodGet, url, nil)
 			req.Header.Set("knative-activator-probe", "true")
@@ -177,6 +178,8 @@ func (ks *kpaScaler) Scale(ctx context.Context, pa *pav1alpha1.PodAutoscaler, de
 				logger.Errorf("Failed to read response from probe request to %s", url, err)
 				return desiredScale, nil
 			}
+
+			logger.Infof("Body was: %s", string(body))
 
 			if string(body) == "queue-proxy" {
 				return desiredScale, nil
