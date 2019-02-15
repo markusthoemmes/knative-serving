@@ -56,7 +56,7 @@ func TestActivatorOverload(t *testing.T) {
 	// 1000 = the number concurrent connections in Istio.
 	concurrency := 1000
 	// Timeout to wait for the responses.
-	// Ideally we must wait ~30 seconds, need to figure out where the delta comes from.
+	// Ideally we must wait ~30 seconds, TODO: need to figure out where the delta comes from.
 	timeout := 65 * time.Second
 	// How long the service will process the request in ms.
 	serviceSleep := 300
@@ -82,7 +82,7 @@ func TestActivatorOverload(t *testing.T) {
 }
 
 func setupAndWaitForScaleDown(logger *logging.BaseLogger, clients *test.Clients, names test.ResourceNames, t *testing.T) string {
-
+	t.Helper()
 	configOptions := test.Options{
 		ContainerConcurrency: 1,
 	}
@@ -166,19 +166,25 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 		logger.Info("Done sending out requests")
 		doneChan <- struct{}{}
 	}()
+
 	logger.Info("Waiting for all requests to finish")
+
 	select {
 	case <-doneChan:
 		// success
+	case <-time.Tick(10 * time.Second):
+		logger.Info("Received responses: %d", atomic.LoadInt32(&responses))
 	case err := <-errChan:
 		t.Fatalf("Error happened while waiting for the responses: %v", err)
 	case <-timeoutChan:
 		t.Fatalf("Timed out after %s while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
 	}
+
+	logger.Info("All requests are finished")
+
 	if atomic.LoadInt32(&responses) != int32(concurrency) {
 		t.Fatalf("Responses from the activator, wanted %d, got %d", responses, concurrency)
 	}
-	logger.Info("All requests are finished")
 }
 
 func analyseResponses(respChan chan *spoof.Response, total int, timeout time.Duration, t *testing.T) {
@@ -196,7 +202,7 @@ func analyseResponses(respChan chan *spoof.Response, total int, timeout time.Dur
 				t.Errorf("no response code received for the request")
 			}
 		case <-timeoutChan:
-			t.Errorf("timed out after %d while analyzing the responses", timeout)
+			t.Fatalf("timed out after %d while analyzing the responses", timeout)
 		}
 	}
 }
