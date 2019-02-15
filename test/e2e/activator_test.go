@@ -65,12 +65,12 @@ func TestActivatorOverload(t *testing.T) {
 		t.Fatalf("Failed to create Configuration: %v", err)
 	}
 
+	test.CleanupOnInterrupt(func() { TearDown(clients, helloWorldNames, logger) }, logger)
+	defer TearDown(clients, helloWorldNames, logger)
+
 	if _, err := test.CreateRoute(logger, clients, helloWorldNames); err != nil {
 		t.Fatalf("Failed to create Route: %v", err)
 	}
-
-	test.CleanupOnInterrupt(func() { TearDown(clients, helloWorldNames, logger) }, logger)
-	defer TearDown(clients, helloWorldNames, logger)
 
 	revision, err := test.WaitForConfigLatestRevision(clients, helloWorldNames)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestActivatorOverload(t *testing.T) {
 
 	helloWorldRoute, err := clients.ServingClient.Routes.Get(helloWorldNames.Route, metav1.GetOptions{})
 	if err != nil {
-		t.Fatalf("Failed to get Route %q of helloworld app: %v", helloWorldNames.Route, err)
+		t.Fatalf("Failed to get Route %s of helloworld app: %v", helloWorldNames.Route, err)
 	}
 
 	domain := helloWorldRoute.Status.Domain
@@ -150,7 +150,7 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 			group.Go(func() error {
 				res, err := roundTrip()
 				if err != nil {
-					return fmt.Errorf("Unexpected error sending a request, %v\n", err)
+					return fmt.Errorf("unexpected error sending a request, %v\n", err)
 				}
 				atomic.AddInt32(&responses, 1)
 				resChannel <- res
@@ -159,7 +159,7 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 		}
 		err := group.Wait()
 		if err != nil {
-			errChan <- fmt.Errorf("Unexpected error making requests against activator: %v", err)
+			errChan <- fmt.Errorf("unexpected error making requests against activator: %v", err)
 		}
 		logger.Info("Done sending out requests")
 		doneChan <- struct{}{}
@@ -180,20 +180,21 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 }
 
 func analyseResponses(respChan chan *spoof.Response, total int, timeout time.Duration, t *testing.T) {
+	t.Helper()
 	timeoutChan := time.After(timeout)
-	wantResponse := 200
+	wantResponse := http.StatusOK
 	for i := 0; i < total; i++ {
 		select {
 		case resp := <-respChan:
 			if resp != nil {
 				if resp.StatusCode != wantResponse {
-					t.Errorf("Response code expected: %d, got %d", wantResponse, resp.StatusCode)
+					t.Errorf("response code expected: %d, got %d", wantResponse, resp.StatusCode)
 				}
 			} else {
-				t.Errorf("No response code received for the request")
+				t.Errorf("no response code received for the request")
 			}
 		case <-timeoutChan:
-			t.Errorf("Timed out after %d while analyzing the responses", timeout)
+			t.Errorf("timed out after %d while analyzing the responses", timeout)
 		}
 	}
 }
@@ -204,7 +205,6 @@ func roundTrip(client *spoof.SpoofingClient, url string) func() (*spoof.Response
 		if err != nil {
 			return nil, fmt.Errorf("error creating http request: %v", err)
 		}
-		res, err := client.Do(req)
-		return res, err
+		return client.Do(req)
 	}
 }
