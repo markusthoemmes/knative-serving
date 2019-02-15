@@ -31,7 +31,6 @@ import (
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	pkgTest "github.com/knative/pkg/test"
 	"golang.org/x/sync/errgroup"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestActivatorOverload makes sure that activator can handle the load when scaling from 0.
@@ -41,28 +40,56 @@ func TestActivatorOverload(t *testing.T) {
 		clients *test.Clients
 		logger  *logging.BaseLogger
 	)
-	// Create a service with concurrency 1 that could sleep for N ms.
-	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
+	const (
+		// The number of concurrent requests to hit the activator with.
+		// 1000 = the number concurrent connections in Istio.
+		concurrency = 1000
+		// Timeout to wait for the responses.
+		// Ideally we must wait ~30 seconds, TODO: need to figure out where the delta comes from.
+		timeout = 65 * time.Second
+		// How long the service will process the request in ms.
+		serviceSleep = 300
+	)
 	logger = logging.GetContextLogger(t.Name())
 	clients = Setup(t)
 
 	helloWorldNames := test.ResourceNames{
-		Config: test.AppendRandomString(configName, logger),
-		Route:  test.AppendRandomString(routeName, logger),
-		Image:  "observed-concurrency",
+		Service: test.AppendRandomString(configName, logger),
+		Image:   "observed-concurrency",
 	}
 
-	// The number of concurrent requests to hit the activator with.
-	// 1000 = the number concurrent connections in Istio.
-	concurrency := 1000
-	// Timeout to wait for the responses.
-	// Ideally we must wait ~30 seconds, TODO: need to figure out where the delta comes from.
-	timeout := 65 * time.Second
-	// How long the service will process the request in ms.
-	serviceSleep := 300
+	configOptions := test.Options{
+		ContainerConcurrency: 1,
+	}
 
-	domain := setupAndWaitForScaleDown(logger, clients, helloWorldNames, t)
+	fopt := func(service *v1alpha1.Service) {
+		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations = make(map[string]string)
+		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations["autoscaling.knative.dev/maxScale"] = "10"
+	}
+
+	test.CleanupOnInterrupt(func() { TearDown(clients, helloWorldNames, logger) }, logger)
 	defer TearDown(clients, helloWorldNames, logger)
+
+	// Create a service with concurrency 1 that could sleep for N ms.
+	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
+	resources, err := test.CreateRunLatestServiceReady(logger, clients, &helloWorldNames, &configOptions, fopt)
+	if err != nil {
+		t.Fatalf("Unable to create resources: %v", err)
+	}
+	domain := resources.Route.Status.Domain
+
+	deploymentName := resources.Revision.Name + "-deployment"
+
+	logger.Info("Waiting for deployment to scale to zero.")
+	if err := pkgTest.WaitForDeploymentState(
+		clients.KubeClient,
+		deploymentName,
+		test.DeploymentScaledToZeroFunc,
+		"DeploymentScaledToZero",
+		test.ServingNamespace,
+		2*time.Minute); err != nil {
+		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
+	}
 
 	endpoint, err := spoof.GetServiceEndpoint(clients.KubeClient.Kube)
 	if err != nil {
@@ -79,60 +106,6 @@ func TestActivatorOverload(t *testing.T) {
 	sendRequests(roundTrip, concurrency, responseChannel, timeout, logger, t)
 
 	analyseResponses(responseChannel, concurrency, timeout, t)
-}
-
-func setupAndWaitForScaleDown(logger *logging.BaseLogger, clients *test.Clients, names test.ResourceNames, t *testing.T) string {
-	t.Helper()
-	configOptions := test.Options{
-		ContainerConcurrency: 1,
-	}
-
-	fopt := func(config *v1alpha1.Configuration) {
-		config.Spec.RevisionTemplate.Annotations = make(map[string]string)
-		config.Spec.RevisionTemplate.Annotations["autoscaling.knative.dev/maxScale"] = "10"
-	}
-
-	test.CleanupOnInterrupt(func() { TearDown(clients, names, logger) }, logger)
-
-	if _, err := test.CreateConfiguration(logger, clients, names, &configOptions, fopt); err != nil {
-		t.Fatalf("Failed to create Configuration: %v", err)
-	}
-
-	if _, err := test.CreateRoute(logger, clients, names); err != nil {
-		t.Fatalf("Failed to create Route: %v", err)
-	}
-
-	revision, err := test.WaitForConfigLatestRevision(clients, names)
-	if err != nil {
-		t.Fatalf("Configuration %s was not updated with the new revision: %v", names.Config, err)
-	}
-
-	logger.Info("When the Route reports as Ready, everything should be ready.")
-	if err := test.WaitForRouteState(clients.ServingClient, names.Route, test.IsRouteReady, "RouteIsReady"); err != nil {
-		t.Fatalf("The Route %s was not marked as Ready to serve traffic: %v", names.Route, err)
-	}
-
-	helloWorldRoute, err := clients.ServingClient.Routes.Get(names.Route, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get Route %s of helloworld app: %v", names.Route, err)
-	}
-
-	domain := helloWorldRoute.Status.Domain
-
-	deploymentName := revision + "-deployment"
-
-	logger.Info("Waiting for deployment to scale to zero.")
-	if err := pkgTest.WaitForDeploymentState(
-		clients.KubeClient,
-		deploymentName,
-		test.DeploymentScaledToZeroFunc,
-		"DeploymentScaledToZero",
-		test.ServingNamespace,
-		2*time.Minute); err != nil {
-		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
-	}
-
-	return domain
 }
 
 func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
@@ -169,18 +142,20 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 
 	logger.Info("Waiting for all requests to finish")
 
-	select {
-	case <-doneChan:
-		// success
-	case <-time.Tick(10 * time.Second):
-		logger.Info("Received responses: %d", atomic.LoadInt32(&responses))
-	case err := <-errChan:
-		t.Fatalf("Error happened while waiting for the responses: %v", err)
-	case <-timeoutChan:
-		t.Fatalf("Timed out after %s while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
+done:
+	for {
+		select {
+		case <-doneChan:
+			break done
+		case <-time.Tick(5 * time.Second):
+			logger.Infof("Received responses: %d", atomic.LoadInt32(&responses))
+		case err := <-errChan:
+			t.Fatalf("Error happened while waiting for the responses: %v", err)
+		case <-timeoutChan:
+			t.Fatalf("Timed out after %s while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
+		}
 	}
-
-	logger.Info("All requests are finished")
+	logger.Info("Finished waiting for the responses")
 
 	if atomic.LoadInt32(&responses) != int32(concurrency) {
 		t.Fatalf("Responses from the activator, wanted %d, got %d", responses, concurrency)
