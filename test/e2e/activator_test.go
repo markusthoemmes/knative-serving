@@ -1,23 +1,24 @@
 package e2e
 
 import (
-	"testing"
-	"github.com/knative/pkg/test/logging"
-	"github.com/knative/serving/test"
-
-	pkgTest "github.com/knative/pkg/test"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"fmt"
-	//"time"
-	"net/http"
-	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
+	"testing"
 	"time"
-	"github.com/knative/pkg/test/spoof"
-	"golang.org/x/sync/errgroup"
 	"sync/atomic"
+	"net/http"
+
+	"github.com/knative/pkg/test/logging"
+	"github.com/knative/pkg/test/spoof"
+	"github.com/knative/serving/test"
+	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
+	pkgTest "github.com/knative/pkg/test"
+	"golang.org/x/sync/errgroup"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestServiceThroughput(t *testing.T) {
+// TestActivatorOverload makes sure that activator can handle the load when scaling from 0.
+// We need to add a similar test for the User pod overload once the second part of overload handling is done.
+func TestActivatorOverload(t *testing.T) {
 	var (
 		clients *test.Clients
 		logger  *logging.BaseLogger
@@ -80,7 +81,7 @@ func TestServiceThroughput(t *testing.T) {
 		"DeploymentScaledToZero",
 		test.ServingNamespace,
 		2*time.Minute); err != nil {
-		fmt.Errorf("Failed waiting for deployment to scale to zero: %v", err)
+		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
 	}
 
 	// Hit the service with concurrent requests to provoke the start from 0,
@@ -89,88 +90,78 @@ func TestServiceThroughput(t *testing.T) {
 	logger.Info("Waiting for endpoint to serve request")
 
 	endpoint, err := spoof.GetServiceEndpoint(clients.KubeClient.Kube)
-	url := fmt.Sprintf("http://%s/?timeout=100", *endpoint)
+	if err != nil {
+		t.Fatalf("Could not get service endpoint for spoofing client")
+	}
+
+	// Under ideal condition we should wait ~30 seconds, but we add some delta
+	// to compensate the time k8s to provision the containers.
+	// Given that the have sub-second pod start time, this values must be revisited.
+	timeout := 65 * time.Second
+	// Time the service will process the request in ms.
+	serviceSleep := 300
+	// 1000 requests = the number concurrent connections in Istio.
+	concurrency := 1000
+
+	url := fmt.Sprintf("http://%s/?timeout=%d", *endpoint, serviceSleep)
 
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
 
-	totalRequests := 1000
-	responseChannel := make(chan *spoof.Response, totalRequests)
-	timeout := 30 * time.Second
+	responseChannel := make(chan *spoof.Response, concurrency)
 	roundTrip := roundTrip(client, url)
 
-	sendRequests(roundTrip, 1000, totalRequests, responseChannel, timeout, logger, t)
+	sendRequests(roundTrip, concurrency, responseChannel, timeout, logger, t)
 
-	collectResponses(responseChannel, totalRequests, timeout, t)
+	analyseResponses(responseChannel, concurrency, timeout, t)
 }
 
-func sendRequests(roundTrip func() (*spoof.Response, error), concurrency, totalRequests int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) int32 {
+func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
 	var (
 		group     errgroup.Group
 		responses int32
 	)
-	// The eventual number of sent requests is mod(concurrency).
-	runs := totalRequests / concurrency
-	tickChan := make(chan struct{}, runs)
 	doneChan := make(chan struct{})
 	timeoutChan := time.After(timeout)
 	errChan := make(chan error)
-	allDoneChan := make(chan struct{})
 
-	// Send a tick for each batch of requests.
+	// Send out the requests asynchronously and wait for them to finish.
 	go func() {
-		for i := 0; i < runs; i++ {
-			tickChan <- struct{}{}
-			<-doneChan
-		}
-		allDoneChan <- struct{}{}
-	}()
-
-	// Run a batch of requests.
-	go func() {
-		for {
-			select {
-			case <-tickChan:
-				logger.Info("Starting to execute the batch of requests")
-				//	Send requests async and wait for the responses.
-				for i := 0; i < concurrency; i++ {
-					group.Go(func() error {
-						res, err := roundTrip()
-						if err != nil {
-							errChan <- fmt.Errorf("Unexpected error sending a request, %v\n", err)
-						}
-						atomic.AddInt32(&responses, 1)
-						resChannel <- res
-						return nil
-					})
-				}
-				err := group.Wait()
+		logger.Info("Starting to send out the requests")
+		//	Send requests async and wait for the responses.
+		for i := 0; i < concurrency; i++ {
+			group.Go(func() error {
+				res, err := roundTrip()
 				if err != nil {
-					errChan <- fmt.Errorf("Unexpected error making requests against activator: %v", err)
+					return fmt.Errorf("Unexpected error sending a request, %v\n", err)
 				}
-				logger.Info("Finished the execution of the requests")
-				doneChan <- struct{}{}
-				continue
-			case <-timeoutChan:
-				errChan <- fmt.Errorf("Timeout out waiting for responses, want - %d, got - %d", totalRequests, atomic.LoadInt32(&responses))
-				return
-			}
+				atomic.AddInt32(&responses, 1)
+				resChannel <- res
+				return nil
+			})
 		}
+		err := group.Wait()
+		if err != nil {
+			errChan <- fmt.Errorf("Unexpected error making requests against activator: %v", err)
+		}
+		logger.Info("Done sending out requests")
+		doneChan <- struct{}{}
 	}()
 	logger.Info("Waiting for all requests to finish")
 	select {
-	case <-allDoneChan:
+	case <-doneChan:
 		// success
 	case err := <-errChan:
 		t.Fatalf("Error happened while waiting for the responses: %v", err)
 	case <-timeoutChan:
-		t.Fatalf("Timeout waiting for resopnses")
+		t.Fatalf("Timed out after %s while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
 	}
-
+	if atomic.LoadInt32(&responses) != int32(concurrency) {
+		t.Fatalf("Responses from the activator, wanted %d, got %d", responses, concurrency)
+	}
 	logger.Info("All requests are finished")
-	return atomic.LoadInt32(&responses)
 }
 
-func collectResponses(respChan chan *spoof.Response, total int, timeout time.Duration, t *testing.T) {
+func analyseResponses(respChan chan *spoof.Response, total int, timeout time.Duration, t *testing.T) {
 	timeoutChan := time.After(timeout)
 	wantResponse := 200
 	for i := 0; i < total; i++ {
@@ -184,7 +175,7 @@ func collectResponses(respChan chan *spoof.Response, total int, timeout time.Dur
 				t.Errorf("No response code received for the request")
 			}
 		case <-timeoutChan:
-			t.Errorf("Timed out waiting for responses after %s", timeout)
+			t.Errorf("Timed out after %d while analyzing the responses", timeout)
 		}
 	}
 }
