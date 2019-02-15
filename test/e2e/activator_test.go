@@ -52,6 +52,37 @@ func TestActivatorOverload(t *testing.T) {
 		Image:  "observed-concurrency",
 	}
 
+	// The number of concurrent requests to hit the activator with.
+	// 1000 = the number concurrent connections in Istio.
+	concurrency := 1000
+	// Timeout to wait for the responses.
+	// Ideally we must wait ~30 seconds, need to figure out where the delta comes from.
+	timeout := 65 * time.Second
+	// How long the service will process the request in ms.
+	serviceSleep := 300
+
+	domain := setupAndWaitForScaleDown(logger, clients, helloWorldNames, t)
+	defer TearDown(clients, helloWorldNames, logger)
+
+	endpoint, err := spoof.GetServiceEndpoint(clients.KubeClient.Kube)
+	if err != nil {
+		t.Fatalf("Could not get service endpoint for spoofing client")
+	}
+
+	url := fmt.Sprintf("http://%s/?timeout=%d", *endpoint, serviceSleep)
+
+	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
+
+	responseChannel := make(chan *spoof.Response, concurrency)
+	roundTrip := roundTrip(client, url)
+
+	sendRequests(roundTrip, concurrency, responseChannel, timeout, logger, t)
+
+	analyseResponses(responseChannel, concurrency, timeout, t)
+}
+
+func setupAndWaitForScaleDown(logger *logging.BaseLogger, clients *test.Clients, names test.ResourceNames, t *testing.T) string {
+
 	configOptions := test.Options{
 		ContainerConcurrency: 1,
 	}
@@ -61,30 +92,29 @@ func TestActivatorOverload(t *testing.T) {
 		config.Spec.RevisionTemplate.Annotations["autoscaling.knative.dev/maxScale"] = "10"
 	}
 
-	if _, err := test.CreateConfiguration(logger, clients, helloWorldNames, &configOptions, fopt); err != nil {
+	test.CleanupOnInterrupt(func() { TearDown(clients, names, logger) }, logger)
+
+	if _, err := test.CreateConfiguration(logger, clients, names, &configOptions, fopt); err != nil {
 		t.Fatalf("Failed to create Configuration: %v", err)
 	}
 
-	test.CleanupOnInterrupt(func() { TearDown(clients, helloWorldNames, logger) }, logger)
-	defer TearDown(clients, helloWorldNames, logger)
-
-	if _, err := test.CreateRoute(logger, clients, helloWorldNames); err != nil {
+	if _, err := test.CreateRoute(logger, clients, names); err != nil {
 		t.Fatalf("Failed to create Route: %v", err)
 	}
 
-	revision, err := test.WaitForConfigLatestRevision(clients, helloWorldNames)
+	revision, err := test.WaitForConfigLatestRevision(clients, names)
 	if err != nil {
-		t.Fatalf("Configuration %s was not updated with the new revision: %v", helloWorldNames.Config, err)
+		t.Fatalf("Configuration %s was not updated with the new revision: %v", names.Config, err)
 	}
 
 	logger.Info("When the Route reports as Ready, everything should be ready.")
-	if err := test.WaitForRouteState(clients.ServingClient, helloWorldNames.Route, test.IsRouteReady, "RouteIsReady"); err != nil {
-		t.Fatalf("The Route %s was not marked as Ready to serve traffic: %v", helloWorldNames.Route, err)
+	if err := test.WaitForRouteState(clients.ServingClient, names.Route, test.IsRouteReady, "RouteIsReady"); err != nil {
+		t.Fatalf("The Route %s was not marked as Ready to serve traffic: %v", names.Route, err)
 	}
 
-	helloWorldRoute, err := clients.ServingClient.Routes.Get(helloWorldNames.Route, metav1.GetOptions{})
+	helloWorldRoute, err := clients.ServingClient.Routes.Get(names.Route, metav1.GetOptions{})
 	if err != nil {
-		t.Fatalf("Failed to get Route %s of helloworld app: %v", helloWorldNames.Route, err)
+		t.Fatalf("Failed to get Route %s of helloworld app: %v", names.Route, err)
 	}
 
 	domain := helloWorldRoute.Status.Domain
@@ -102,35 +132,7 @@ func TestActivatorOverload(t *testing.T) {
 		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
 	}
 
-	// Hit the service with concurrent requests to provoke the start from 0,
-	// the requests should go through activator, we make sure we receive only 200 responses.
-
-	logger.Info("Waiting for endpoint to serve request")
-
-	endpoint, err := spoof.GetServiceEndpoint(clients.KubeClient.Kube)
-	if err != nil {
-		t.Fatalf("Could not get service endpoint for spoofing client")
-	}
-
-	// Under ideal condition we should wait ~30 seconds, but we add some delta
-	// to compensate the time k8s to provision the containers.
-	// Given that the have sub-second pod start time, this values must be revisited.
-	timeout := 65 * time.Second
-	// Time the service will process the request in ms.
-	serviceSleep := 300
-	// 1000 requests = the number concurrent connections in Istio.
-	concurrency := 1000
-
-	url := fmt.Sprintf("http://%s/?timeout=%d", *endpoint, serviceSleep)
-
-	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
-
-	responseChannel := make(chan *spoof.Response, concurrency)
-	roundTrip := roundTrip(client, url)
-
-	sendRequests(roundTrip, concurrency, responseChannel, timeout, logger, t)
-
-	analyseResponses(responseChannel, concurrency, timeout, t)
+	return domain
 }
 
 func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
