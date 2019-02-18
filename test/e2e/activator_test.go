@@ -96,14 +96,13 @@ func TestActivatorOverload(t *testing.T) {
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
 
 	responseChannel := make(chan *spoof.Response, concurrency)
-	roundTrip := roundTrip(client, url)
 
-	sendRequests(roundTrip, concurrency, responseChannel, timeout, logger, t)
+	sendRequests(client, url, concurrency, responseChannel, timeout, logger, t)
 
 	analyseResponses(responseChannel, concurrency, timeout, t)
 }
 
-func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
+func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
 	var (
 		group     errgroup.Group
 		responses int32
@@ -118,11 +117,11 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 		// Send requests async and wait for the responses.
 		for i := 0; i < concurrency; i++ {
 			group.Go(func() error {
-				http.NewRequest(http.MethodGet, url, nil)
+				req, err := http.NewRequest(http.MethodGet, url, nil)
 				if err != nil {
-					return nil, fmt.Errorf("error creating http request: %v", err)
+					return fmt.Errorf("error creating http request: %v", err)
 				}
-				req, err := client.Do(req)
+				res, err := client.Do(req)
 				if err != nil {
 					return fmt.Errorf("unexpected error sending a request, %v\n", err)
 				}
