@@ -91,12 +91,7 @@ func TestActivatorOverload(t *testing.T) {
 		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
 	}
 
-	endpoint, err := spoof.GetServiceEndpoint(clients.KubeClient.Kube)
-	if err != nil {
-		t.Fatalf("Could not get service endpoint for spoofing client")
-	}
-
-	url := fmt.Sprintf("http://%s/?timeout=%d", *endpoint, serviceSleep)
+	url := fmt.Sprintf("http://%s/?timeout=%d", domain, serviceSleep)
 
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
 
@@ -120,10 +115,14 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 	// Send out the requests asynchronously and wait for them to finish.
 	go func() {
 		logger.Info("Starting to send out the requests")
-		//	Send requests async and wait for the responses.
+		// Send requests async and wait for the responses.
 		for i := 0; i < concurrency; i++ {
 			group.Go(func() error {
-				res, err := roundTrip()
+				http.NewRequest(http.MethodGet, url, nil)
+				if err != nil {
+					return nil, fmt.Errorf("error creating http request: %v", err)
+				}
+				req, err := client.Do(req)
 				if err != nil {
 					return fmt.Errorf("unexpected error sending a request, %v\n", err)
 				}
@@ -132,12 +131,11 @@ func sendRequests(roundTrip func() (*spoof.Response, error), concurrency int, re
 				return nil
 			})
 		}
-		err := group.Wait()
-		if err != nil {
+		if err := group.Wait(); err != nil {
 			errChan <- fmt.Errorf("unexpected error making requests against activator: %v", err)
 		}
 		logger.Info("Done sending out requests")
-		doneChan <- struct{}{}
+		close(doneChan)
 	}()
 
 	logger.Info("Waiting for all requests to finish")
@@ -152,13 +150,13 @@ done:
 		case err := <-errChan:
 			t.Fatalf("Error happened while waiting for the responses: %v", err)
 		case <-timeoutChan:
-			t.Fatalf("Timed out after %s while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
+			t.Fatalf("Timed out after %v while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
 		}
 	}
 	logger.Info("Finished waiting for the responses")
 
 	if atomic.LoadInt32(&responses) != int32(concurrency) {
-		t.Fatalf("Responses from the activator, wanted %d, got %d", responses, concurrency)
+		t.Fatalf("Number of activator responses = %d, want: %d", responses, concurrency)
 	}
 }
 
@@ -171,23 +169,13 @@ func analyseResponses(respChan chan *spoof.Response, total int, timeout time.Dur
 		case resp := <-respChan:
 			if resp != nil {
 				if resp.StatusCode != wantResponse {
-					t.Errorf("response code expected: %d, got %d", wantResponse, resp.StatusCode)
+					t.Errorf("Response code = %d, want: %d", resp.StatusCode, wantResponse)
 				}
 			} else {
-				t.Errorf("no response code received for the request")
+				t.Errorf("No response code received for the request")
 			}
 		case <-timeoutChan:
 			t.Fatalf("timed out after %d while analyzing the responses", timeout)
 		}
-	}
-}
-
-func roundTrip(client *spoof.SpoofingClient, url string) func() (*spoof.Response, error) {
-	return func() (*spoof.Response, error) {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error creating http request: %v", err)
-		}
-		return client.Do(req)
 	}
 }
