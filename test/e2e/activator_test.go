@@ -61,8 +61,7 @@ func TestActivatorOverload(t *testing.T) {
 	}
 
 	fopt := func(service *v1alpha1.Service) {
-		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations = make(map[string]string)
-		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations["autoscaling.knative.dev/maxScale"] = "10"
+		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations = map[string]string{"autoscaling.knative.dev/maxScale": "10"}
 	}
 
 	test.CleanupOnInterrupt(func() { TearDown(clients, names, logger) }, logger)
@@ -92,19 +91,19 @@ func TestActivatorOverload(t *testing.T) {
 	url := fmt.Sprintf("http://%s/?timeout=%d", domain, serviceSleep)
 
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
+	client.RequestTimeout = timeout
 
-	responseChannel := make(chan *spoof.Response, concurrency)
-
-	sendRequests(client, url, concurrency, responseChannel, timeout, logger, t)
+	sendRequests(client, url, concurrency, timeout, logger, t)
 
 }
 
-func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, resChannel chan *spoof.Response, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
+func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
 	t.Helper()
 	var (
 		group        errgroup.Group
 		responses    int32
 		wantResponse = http.StatusOK
+		resChannel   = make(chan *spoof.Response, concurrency)
 	)
 	timeoutChan := time.After(timeout)
 	errChan := make(chan error)
@@ -112,7 +111,7 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, res
 	// Send out the requests asynchronously and wait for them to finish.
 	logger.Info("Starting to send out the requests")
 
-	// Print out stats.
+	// Print out stats and wait for a global timeout.
 	go func() {
 		for {
 			select {
@@ -163,13 +162,7 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, res
 		}
 	case err := <-errChan:
 		t.Fatalf("Error happened while waiting for the responses: %v", err)
-	case <-timeoutChan:
-		t.Fatalf("Timed out after %v while collecting responses, collected responses %d, out of %d", timeout, atomic.LoadInt32(&responses), concurrency)
 	}
-
 	logger.Info("Finished waiting for the responses")
 
-	if atomic.LoadInt32(&responses) != int32(concurrency) {
-		t.Fatalf("Number of activator responses = %d, want: %d", responses, concurrency)
-	}
 }
