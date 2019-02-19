@@ -52,7 +52,7 @@ func TestActivatorOverload(t *testing.T) {
 	)
 
 	names := test.ResourceNames{
-		Service: test.AppendRandomString(configName, logger),
+		Service: test.AppendRandomString(configName),
 		Image:   "observed-concurrency",
 	}
 
@@ -64,12 +64,12 @@ func TestActivatorOverload(t *testing.T) {
 		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations = map[string]string{"autoscaling.knative.dev/maxScale": "10"}
 	}
 
-	test.CleanupOnInterrupt(func() { TearDown(clients, names, logger) }, logger)
-	defer TearDown(clients, names, logger)
+	test.CleanupOnInterrupt(func() { test.TearDown(clients, names) })
+	defer test.TearDown(clients, names)
 
 	// Create a service with concurrency 1 that could sleep for N ms.
 	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
-	resources, err := test.CreateRunLatestServiceReady(logger, clients, &names, &configOptions, fopt)
+	resources, err := test.CreateRunLatestServiceReady(t, clients, &names, &configOptions, fopt)
 	if err != nil {
 		t.Fatalf("Unable to create resources: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestActivatorOverload(t *testing.T) {
 
 	url := fmt.Sprintf("http://%s/?timeout=%d", domain, serviceSleep)
 
-	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, logger, domain, test.ServingFlags.ResolvableDomain)
+	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, t.Logf, domain, test.ServingFlags.ResolvableDomain)
 	client.RequestTimeout = timeout
 
 	sendRequests(client, url, concurrency, timeout, logger, t)
@@ -147,21 +147,24 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 
 	logger.Info("Waiting for all requests to finish")
 
-	select {
-	case resp, ok := <-resChannel:
-		if !ok {
-			// The channel is closed, no more responses.
-			break
-		}
-		if resp != nil {
-			if resp.StatusCode != wantResponse {
-				t.Errorf("Response code = %d, want: %d", resp.StatusCode, wantResponse)
+done:
+	for {
+		select {
+		case resp, ok := <-resChannel:
+			if !ok {
+				// The channel is closed, no more responses.
+				break done
 			}
-		} else {
-			t.Errorf("No response code received for the request")
+			if resp != nil {
+				if resp.StatusCode != wantResponse {
+					t.Errorf("Response code = %d, want: %d", resp.StatusCode, wantResponse)
+				}
+			} else {
+				t.Errorf("No response code received for the request")
+			}
+		case err := <-errChan:
+			t.Fatalf("Error happened while waiting for the responses: %v", err)
 		}
-	case err := <-errChan:
-		t.Fatalf("Error happened while waiting for the responses: %v", err)
 	}
 	logger.Info("Finished waiting for the responses")
 
