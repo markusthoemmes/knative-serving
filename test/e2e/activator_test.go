@@ -117,6 +117,9 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 			select {
 			case <-time.Tick(5 * time.Second):
 				logger.Infof("Received responses: %d", atomic.LoadInt32(&responses))
+				if concurrency == atomic.LoadInt32(&responses) {
+					return
+				}
 			case <-timeoutChan:
 				return
 			}
