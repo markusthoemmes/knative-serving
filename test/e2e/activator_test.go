@@ -94,7 +94,6 @@ func TestActivatorOverload(t *testing.T) {
 	client.RequestTimeout = timeout
 
 	sendRequests(client, url, concurrency, timeout, logger, t)
-
 }
 
 func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
@@ -111,13 +110,13 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 	// Send out the requests asynchronously and wait for them to finish.
 	logger.Info("Starting to send out the requests")
 
-	// Print out stats and wait for a global timeout.
+	// Print out stats until we reach the required number of responses or for the global timeout to fire.
 	go func() {
 		for {
 			select {
 			case <-time.Tick(5 * time.Second):
 				logger.Infof("Received responses: %d", atomic.LoadInt32(&responses))
-				if concurrency == atomic.LoadInt32(&responses) {
+				if int32(concurrency) == atomic.LoadInt32(&responses) {
 					return
 				}
 			case <-timeoutChan:
@@ -148,7 +147,7 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 	logger.Info("Done sending out requests")
 	close(resChannel)
 
-	logger.Info("Waiting for all requests to finish")
+	logger.Info("Process the responses")
 
 done:
 	for {
@@ -169,6 +168,4 @@ done:
 			t.Fatalf("Error happened while waiting for the responses: %v", err)
 		}
 	}
-	logger.Info("Finished waiting for the responses")
-
 }
