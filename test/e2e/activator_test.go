@@ -67,6 +67,7 @@ func TestActivatorOverload(t *testing.T) {
 	test.CleanupOnInterrupt(func() { test.TearDown(clients, names) })
 	defer test.TearDown(clients, names)
 
+	logger.Info("Creating a service with run latest configuration.")
 	// Create a service with concurrency 1 that could sleep for N ms.
 	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
 	resources, err := test.CreateRunLatestServiceReady(t, clients, &names, &configOptions, fopt)
@@ -149,13 +150,12 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 
 	logger.Info("Process the responses")
 
-done:
 	for {
 		select {
 		case resp, ok := <-resChannel:
 			if !ok {
 				// The channel is closed, no more responses.
-				break done
+				return
 			}
 			if resp != nil {
 				if resp.StatusCode != wantResponse {
