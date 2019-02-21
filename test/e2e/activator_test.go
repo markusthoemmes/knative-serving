@@ -104,14 +104,17 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 		responses    int32
 		wantResponse = http.StatusOK
 		resChannel   = make(chan *spoof.Response, concurrency)
+		errChan      = make(chan error)
+		timeoutChan  = time.After(timeout)
 	)
-	timeoutChan := time.After(timeout)
-	errChan := make(chan error)
 
 	// Send out the requests asynchronously and wait for them to finish.
 	logger.Info("Starting to send out the requests")
 
-	// Print out stats until we reach the required number of responses or for the global timeout to fire.
+	// Print out stats until one of these occurs:
+	// - error happened in sending out requests,
+	// - the global timeout is reached,
+	// - we reached the number of required responses.
 	go func() {
 		for {
 			select {
