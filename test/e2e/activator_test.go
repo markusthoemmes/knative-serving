@@ -115,13 +115,15 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 	go func() {
 		for {
 			select {
+			case <-errChan:
+				return
+			case <-timeoutChan:
+				return
 			case <-time.Tick(5 * time.Second):
 				logger.Infof("Received responses: %d", atomic.LoadInt32(&responses))
 				if int32(concurrency) == atomic.LoadInt32(&responses) {
 					return
 				}
-			case <-timeoutChan:
-				return
 			}
 		}
 	}()
