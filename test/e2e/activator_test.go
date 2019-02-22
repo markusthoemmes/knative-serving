@@ -36,6 +36,7 @@ import (
 // TestActivatorOverload makes sure that activator can handle the load when scaling from 0.
 // We need to add a similar test for the User pod overload once the second part of overload handling is done.
 func TestActivatorOverload(t *testing.T) {
+	t.Parallel()
 	var (
 		logger  = logging.GetContextLogger(t.Name())
 		clients = Setup(t)
@@ -50,17 +51,13 @@ func TestActivatorOverload(t *testing.T) {
 		// How long the service will process the request in ms.
 		serviceSleep = 300
 	)
-
 	names := test.ResourceNames{
-		Service: test.AppendRandomString(configName),
+		Service: test.ObjectNameForTest(t),
 		Image:   "observed-concurrency",
 	}
 
-	configOptions := test.Options{
-		ContainerConcurrency: 1,
-	}
-
 	fopt := func(service *v1alpha1.Service) {
+		service.Spec.RunLatest.Configuration.RevisionTemplate.Spec.ContainerConcurrency = 1
 		service.Spec.RunLatest.Configuration.RevisionTemplate.Annotations = map[string]string{"autoscaling.knative.dev/maxScale": "10"}
 	}
 
@@ -70,7 +67,7 @@ func TestActivatorOverload(t *testing.T) {
 	logger.Info("Creating a service with run latest configuration.")
 	// Create a service with concurrency 1 that could sleep for N ms.
 	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
-	resources, err := test.CreateRunLatestServiceReady(t, clients, &names, &configOptions, fopt)
+	resources, err := test.CreateRunLatestServiceReady(t, clients, &names, &test.Options{}, fopt)
 	if err != nil {
 		t.Fatalf("Unable to create resources: %v", err)
 	}
@@ -85,7 +82,7 @@ func TestActivatorOverload(t *testing.T) {
 		test.DeploymentScaledToZeroFunc,
 		"DeploymentScaledToZero",
 		test.ServingNamespace,
-		2*time.Minute); err != nil {
+		3*time.Minute); err != nil {
 		t.Fatalf("Failed waiting for deployment to scale to zero: %v", err)
 	}
 
