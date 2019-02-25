@@ -101,7 +101,7 @@ func TestActivatorOverload(t *testing.T) {
 			}
 			res, err := client.Do(req)
 			if err != nil {
-				return fmt.Errorf("unexpected error sending a request, %v\n", err)
+				return fmt.Errorf("unexpected error sending a request, %v", err)
 			}
 			resChannel <- res
 			return nil
