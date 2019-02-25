@@ -85,11 +85,8 @@ func TestActivatorOverload(t *testing.T) {
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, t.Logf, domain, test.ServingFlags.ResolvableDomain)
 	client.RequestTimeout = timeout
 
-	var (
-		group        errgroup.Group
-		wantResponse = http.StatusOK
-		resChannel   = make(chan *spoof.Response, concurrency)
-	)
+	var group errgroup.Group
+	resChannel := make(chan *spoof.Response, concurrency)
 	t.Logf("Starting to send out the requests")
 
 	// Send requests async and wait for the responses.
@@ -115,19 +112,13 @@ func TestActivatorOverload(t *testing.T) {
 
 	t.Logf("Process the responses")
 
-	for {
-		select {
-		case resp, ok := <-resChannel:
-			if !ok {
-				// The channel is closed, no more responses.
-				return
+	for resp := range resChannel {
+		if resp != nil {
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Response code = %d, want: %d", resp.StatusCode, http.StatusOK)
 			}
-			if resp != nil {
-				if resp.StatusCode != wantResponse {
-					t.Errorf("Response code = %d, want: %d", resp.StatusCode, wantResponse)
-				}
-			} else {
-				t.Errorf("No response code received for the request")
-			}
+		} else {
+			t.Errorf("No response code received for the request")
+		}
 	}
 }
