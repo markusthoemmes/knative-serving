@@ -89,7 +89,6 @@ func TestActivatorOverload(t *testing.T) {
 		group        errgroup.Group
 		wantResponse = http.StatusOK
 		resChannel   = make(chan *spoof.Response, concurrency)
-		errChan      = make(chan error)
 	)
 	t.Logf("Starting to send out the requests")
 
@@ -109,7 +108,7 @@ func TestActivatorOverload(t *testing.T) {
 		})
 	}
 	if err := group.Wait(); err != nil {
-		errChan <- fmt.Errorf("unexpected error making requests against activator: %v", err)
+		t.Fatalf("unexpected error making requests against activator: %v", err)
 	}
 	t.Logf("Done sending out requests")
 	close(resChannel)
@@ -130,8 +129,5 @@ func TestActivatorOverload(t *testing.T) {
 			} else {
 				t.Errorf("No response code received for the request")
 			}
-		case err := <-errChan:
-			t.Fatalf("Error happened while waiting for the responses: %v", err)
-		}
 	}
 }
