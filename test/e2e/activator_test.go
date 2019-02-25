@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"net/http"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -88,7 +87,6 @@ func TestActivatorOverload(t *testing.T) {
 
 	var (
 		group        errgroup.Group
-		responses    int32
 		wantResponse = http.StatusOK
 		resChannel   = make(chan *spoof.Response, concurrency)
 		errChan      = make(chan error)
@@ -106,7 +104,6 @@ func TestActivatorOverload(t *testing.T) {
 			if err != nil {
 				return fmt.Errorf("unexpected error sending a request, %v\n", err)
 			}
-			atomic.AddInt32(&responses, 1)
 			resChannel <- res
 			return nil
 		})
