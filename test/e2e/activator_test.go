@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/knative/pkg/test/logging"
 	"github.com/knative/pkg/test/spoof"
 	"github.com/knative/serving/test"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
@@ -37,10 +36,6 @@ import (
 // We need to add a similar test for the User pod overload once the second part of overload handling is done.
 func TestActivatorOverload(t *testing.T) {
 	t.Parallel()
-	var (
-		logger  = logging.GetContextLogger(t.Name())
-		clients = Setup(t)
-	)
 	const (
 		// The number of concurrent requests to hit the activator with.
 		// 1000 = the number concurrent connections in Istio.
@@ -51,6 +46,7 @@ func TestActivatorOverload(t *testing.T) {
 		// How long the service will process the request in ms.
 		serviceSleep = 300
 	)
+	clients := Setup(t)
 	names := test.ResourceNames{
 		Service: test.ObjectNameForTest(t),
 		Image:   "observed-concurrency",
@@ -64,7 +60,7 @@ func TestActivatorOverload(t *testing.T) {
 	test.CleanupOnInterrupt(func() { test.TearDown(clients, names) })
 	defer test.TearDown(clients, names)
 
-	logger.Info("Creating a service with run latest configuration.")
+	t.Logf("Creating a service with run latest configuration.")
 	// Create a service with concurrency 1 that could sleep for N ms.
 	// Limit its maxScale to 10 containers, wait for the service to scale down and hit it with concurrent requests.
 	resources, err := test.CreateRunLatestServiceReady(t, clients, &names, &test.Options{}, fopt)
@@ -75,7 +71,7 @@ func TestActivatorOverload(t *testing.T) {
 
 	deploymentName := resources.Revision.Name + "-deployment"
 
-	logger.Info("Waiting for deployment to scale to zero.")
+	t.Logf("Waiting for deployment to scale to zero.")
 	if err := pkgTest.WaitForDeploymentState(
 		clients.KubeClient,
 		deploymentName,
@@ -91,10 +87,10 @@ func TestActivatorOverload(t *testing.T) {
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, t.Logf, domain, test.ServingFlags.ResolvableDomain)
 	client.RequestTimeout = timeout
 
-	sendRequests(client, url, concurrency, timeout, logger, t)
+	sendRequests(client, url, concurrency, t)
 }
 
-func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, timeout time.Duration, logger *logging.BaseLogger, t *testing.T) {
+func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, t *testing.T) {
 	t.Helper()
 	var (
 		group        errgroup.Group
@@ -102,31 +98,8 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 		wantResponse = http.StatusOK
 		resChannel   = make(chan *spoof.Response, concurrency)
 		errChan      = make(chan error)
-		timeoutChan  = time.After(timeout)
 	)
-
-	// Send out the requests asynchronously and wait for them to finish.
-	logger.Info("Starting to send out the requests")
-
-	// Print out stats until one of these occurs:
-	// - error happened in sending out requests,
-	// - the global timeout is reached,
-	// - we reached the number of required responses.
-	go func() {
-		for {
-			select {
-			case <-errChan:
-				return
-			case <-timeoutChan:
-				return
-			case <-time.Tick(5 * time.Second):
-				logger.Infof("Received responses: %d", atomic.LoadInt32(&responses))
-				if int32(concurrency) == atomic.LoadInt32(&responses) {
-					return
-				}
-			}
-		}
-	}()
+	t.Logf("Starting to send out the requests")
 
 	// Send requests async and wait for the responses.
 	for i := 0; i < concurrency; i++ {
@@ -147,10 +120,10 @@ func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, tim
 	if err := group.Wait(); err != nil {
 		errChan <- fmt.Errorf("unexpected error making requests against activator: %v", err)
 	}
-	logger.Info("Done sending out requests")
+	t.Logf("Done sending out requests")
 	close(resChannel)
 
-	logger.Info("Process the responses")
+	t.Logf("Process the responses")
 
 	for {
 		select {
