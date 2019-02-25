@@ -1,5 +1,3 @@
-// +build e2e
-
 /*
 Copyright 2019 The Knative Authors
 
@@ -20,16 +18,17 @@ package e2e
 
 import (
 	"fmt"
+	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
-	"sync/atomic"
-	"net/http"
+
 	"golang.org/x/sync/errgroup"
 
-	"github.com/knative/pkg/test/spoof"
-	"github.com/knative/serving/test"
-	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	pkgTest "github.com/knative/pkg/test"
+	"github.com/knative/pkg/test/spoof"
+	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
+	"github.com/knative/serving/test"
 )
 
 // TestActivatorOverload makes sure that activator can handle the load when scaling from 0.
@@ -87,11 +86,6 @@ func TestActivatorOverload(t *testing.T) {
 	client, err := pkgTest.NewSpoofingClient(clients.KubeClient, t.Logf, domain, test.ServingFlags.ResolvableDomain)
 	client.RequestTimeout = timeout
 
-	sendRequests(client, url, concurrency, t)
-}
-
-func sendRequests(client *spoof.SpoofingClient, url string, concurrency int, t *testing.T) {
-	t.Helper()
 	var (
 		group        errgroup.Group
 		responses    int32
