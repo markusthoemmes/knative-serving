@@ -45,6 +45,9 @@ cd ${REPO_ROOT_DIR}
 # Ensure we have everything we need under vendor/
 dep ensure
 
+# Extract the LICENSE of bitbucket.org/ww/goautoneg from README.txt
+sed -n '11,41p;42q' ${REPO_ROOT_DIR}/vendor/bitbucket.org/ww/goautoneg/README.txt > ${REPO_ROOT_DIR}/vendor/bitbucket.org/ww/goautoneg/LICENSE
+
 rm -rf $(find vendor/ -name 'OWNERS')
 rm -rf $(find vendor/ -name '*_test.go')
 
