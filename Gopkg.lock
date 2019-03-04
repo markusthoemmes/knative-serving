@@ -731,6 +731,14 @@
   version = "1.0.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:24df057f15e7a09e75c1241cbe6f6590fd3eac9804f1110b02efade3214f042d"
+  name = "github.com/munnerz/goautoneg"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a547fc61f48d567d5b4ec6f8aee5573d8efce11d"
+
+[[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -1554,8 +1562,7 @@
   revision = "1ef560bbde5195c01629039ad3b337ce63e7b321"
 
 [[projects]]
-  branch = "master"
-  digest = "1:5b73bdd8ca13d59bd404aad73018996a925829dbdbdd9f7eb3266a06c6984bbf"
+  digest = "1:e33dc14ab4083e5d3358246d88e94d55dadb541f2b0ffadeef946c757846d649"
   name = "k8s.io/kube-openapi"
   packages = [
     "pkg/builder",
@@ -1565,7 +1572,7 @@
     "pkg/util/proto",
   ]
   pruneopts = "NUT"
-  revision = "a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3"
+  revision = "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
 
 [[projects]]
   digest = "1:58b3a85d2c3d0b49f7d4b7f6a3234d7e9c10cbc364af297adca941b67e5bb2f6"

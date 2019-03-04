@@ -69,8 +69,24 @@ required = [
   version = "kubernetes-1.11.3"
 
 [[override]]
+  name = "k8s.io/kube-openapi"
+  revision = "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+
+[[override]]
   name = "github.com/kubernetes-incubator/custom-metrics-apiserver"
   version = "kubernetes-1.11.2"
+
+[[override]]
+  name = "github.com/go-openapi/spec"
+  revision = "1de3e0542de65ad8d75452a595886fdd0befb363"
+
+[[override]]
+  name = "github.com/emicklei/go-restful"
+  version = "v2.2.1"
+
+[[override]]
+  name = "github.com/emicklei/go-restful-swagger12"
+  version = "v1.0.1"
 
 [[override]]
   name = "github.com/json-iterator/go"
@@ -92,6 +108,10 @@ required = [
 [[prune.project]]
   name = "k8s.io/code-generator"
   unused-packages = false
+  non-go = false
+
+[[prune.project]]
+  name = "github.com/munnerz/goautoneg"
   non-go = false
 
 [[prune.project]]

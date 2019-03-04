@@ -21,6 +21,6 @@ func main() {
 	// cmd.WithExternalMetrics(provider)
 
 	if err := cmd.Run(wait.NeverStop); err != nil {
-		panic("unable to run custom metrics adapter: %v", err)
+		panic(err)
 	}
 }
