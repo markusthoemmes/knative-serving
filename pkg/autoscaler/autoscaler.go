@@ -24,10 +24,12 @@ import (
 	"time"
 
 	"github.com/knative/pkg/logging"
+	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"go.uber.org/zap"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 const (
@@ -99,6 +101,7 @@ type Autoscaler struct {
 	namespace       string
 	revisionService string
 	endpointsLister corev1listers.EndpointsLister
+	metricsClient   custom_metrics.CustomMetricsClient
 	reporter        StatsReporter
 
 	// State in panic mode. Carries over multiple Scale calls.
@@ -120,6 +123,7 @@ func New(
 	namespace string,
 	revisionService string,
 	endpointsInformer corev1informers.EndpointsInformer,
+	metricClient custom_metrics.CustomMetricsClient,
 	target float64,
 	reporter StatsReporter) (*Autoscaler, error) {
 	if endpointsInformer == nil {
@@ -130,6 +134,7 @@ func New(
 		namespace:       namespace,
 		revisionService: revisionService,
 		endpointsLister: endpointsInformer.Lister(),
+		metricsClient:   metricClient,
 		target:          target,
 		bucketed:        make(map[time.Time]statsBucket),
 		reporter:        reporter,
@@ -146,92 +151,43 @@ func (a *Autoscaler) Update(spec MetricSpec) error {
 
 // Record a data point.
 func (a *Autoscaler) Record(ctx context.Context, stat Stat) {
-	if stat.Time == nil {
-		logger := logging.FromContext(ctx)
-		logger.Errorf("Missing time from stat: %+v", stat)
-		return
-	}
+	/*	if stat.Time == nil {
+			logger := logging.FromContext(ctx)
+			logger.Errorf("Missing time from stat: %+v", stat)
+			return
+		}
 
-	a.statsMutex.Lock()
-	defer a.statsMutex.Unlock()
+		a.statsMutex.Lock()
+		defer a.statsMutex.Unlock()
 
-	bucketKey := stat.Time.Truncate(bucketSize)
-	bucket, ok := a.bucketed[bucketKey]
-	if !ok {
-		bucket = statsBucket{}
-		a.bucketed[bucketKey] = bucket
-	}
-	bucket.add(&stat)
+		bucketKey := stat.Time.Truncate(bucketSize)
+		bucket, ok := a.bucketed[bucketKey]
+		if !ok {
+			bucket = statsBucket{}
+			a.bucketed[bucketKey] = bucket
+		}
+		bucket.add(&stat)
+	*/
 }
 
 // Scale calculates the desired scale based on current statistics given the current time.
 func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 	logger := logging.FromContext(ctx)
 
-	originalReadyPodsCount, err := readyPodsCountOfEndpoints(a.endpointsLister, a.namespace, a.revisionService)
+	val, err := a.metricsClient.NamespacedMetrics(a.namespace).GetForObject(v1alpha1.Kind("Revision"), a.revisionService, "concurrency")
 	if err != nil {
-		logger.Errorw("Failed to get Endpoints via K8S Lister", zap.Error(err))
-		return 0, false
-	}
-	// Use 1 if there are zero current pods.
-	readyPodsCount := math.Max(1, float64(originalReadyPodsCount))
-
-	config := a.Current()
-
-	observedStableConcurrency, observedPanicConcurrency, lastBucket := a.aggregateData(now, config.StableWindow, config.PanicWindow)
-	if len(a.bucketed) == 0 {
-		logger.Debug("No data to scale on.")
+		logger.Errorw("Failed getting metrics", zap.Error(err))
 		return 0, false
 	}
 
-	// Log system totals.
-	logger.Debugf("Current concurrent clients: %0.3f", lastBucket.concurrency())
-
-	target := a.targetConcurrency()
-	// Desired pod count is observed concurrency of the revision over desired (stable) concurrency per pod.
-	// The scaling up rate is limited to the MaxScaleUpRate.
-	desiredStablePodCount := a.podCountLimited(math.Ceil(observedStableConcurrency/target), readyPodsCount)
-	desiredPanicPodCount := a.podCountLimited(math.Ceil(observedPanicConcurrency/target), readyPodsCount)
-
-	a.reporter.ReportStableRequestConcurrency(observedStableConcurrency)
-	a.reporter.ReportPanicRequestConcurrency(observedPanicConcurrency)
-	a.reporter.ReportTargetRequestConcurrency(target)
-
-	logger.Debugf("STABLE: Observed average %0.3f concurrency over %v seconds.", observedStableConcurrency, config.StableWindow)
-	logger.Debugf("PANIC: Observed average %0.3f concurrency over %v seconds.", observedPanicConcurrency, config.PanicWindow)
-
-	isOverPanicThreshold := observedPanicConcurrency/readyPodsCount >= target*2
-
-	if a.panicTime == nil && isOverPanicThreshold {
-		// Begin panicking when we cross the concurrency threshold in the panic window.
-		logger.Info("PANICKING")
-		a.panicTime = &now
-	} else if a.panicTime != nil && !isOverPanicThreshold && a.panicTime.Add(config.StableWindow).Before(now) {
-		// Stop panicking after the surge has made its way into the stable metric.
-		logger.Info("Un-panicking.")
-		a.panicTime = nil
-		a.maxPanicPods = 0
+	if val.Value.IsZero() {
+		return 0, true
 	}
 
-	var desiredPodCount int32
-	if a.panicTime != nil {
-		logger.Debug("Operating in panic mode.")
-		a.reporter.ReportPanic(1)
-		// We do not scale down while in panic mode. Only increases will be applied.
-		if desiredPanicPodCount > a.maxPanicPods {
-			logger.Infof("Increasing pods from %v to %v.", originalReadyPodsCount, desiredPanicPodCount)
-			a.panicTime = &now
-			a.maxPanicPods = desiredPanicPodCount
-		}
-		desiredPodCount = a.maxPanicPods
-	} else {
-		logger.Debug("Operating in stable mode.")
-		a.reporter.ReportPanic(0)
-		desiredPodCount = desiredStablePodCount
-	}
-
-	a.reporter.ReportDesiredPodCount(int64(desiredPodCount))
-	return desiredPodCount, true
+	concurrencyInSystem, _ := val.Value.AsInt64()
+	logger.Infof("Current scale value: %v", concurrencyInSystem)
+	podsNeeded := float64(concurrencyInSystem) / a.targetConcurrency()
+	return int32(podsNeeded), true
 }
 
 // aggregateData aggregates bucketed stats over the stableWindow and panicWindow

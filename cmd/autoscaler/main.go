@@ -27,7 +27,6 @@ import (
 	"github.com/knative/pkg/system"
 	"github.com/knative/pkg/version"
 	"github.com/knative/serving/pkg/apis/serving"
-	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/autoscaler"
 	"github.com/knative/serving/pkg/autoscaler/statserver"
 	clientset "github.com/knative/serving/pkg/client/clientset/versioned"
@@ -118,6 +117,11 @@ func main() {
 		logger.Fatalw("Error building serving clientset", zap.Error(err))
 	}
 
+	customMetricsClient, err := custom_metrics.NewForConfig(cfg)
+	if err != nil {
+		logger.Fatalw("Error building metric client", zap.Error(err))
+	}
+
 	rawConfig, err := configmap.Load("/etc/config-autoscaler")
 	if err != nil {
 		logger.Fatalw("Error reading autoscaler configuration", zap.Error(err))
@@ -144,7 +148,7 @@ func main() {
 
 	// uniScalerFactory depends endpointsInformer to be set.
 	multiScaler := autoscaler.NewMultiScaler(
-		dynConfig, stopCh, statsCh, uniScalerFactoryFunc(endpointsInformer), statsScraperFactoryFunc(endpointsInformer), logger)
+		dynConfig, stopCh, statsCh, uniScalerFactoryFunc(endpointsInformer, customMetricsClient), statsScraperFactoryFunc(endpointsInformer), logger)
 	kpaScaler := kpa.NewKPAScaler(servingClientSet, scaleClient, logger, configMapWatcher)
 	kpaCtl := kpa.NewController(&opt, paInformer, endpointsInformer, multiScaler, kpaScaler, dynConfig)
 	hpaCtl := hpa.NewController(&opt, paInformer, hpaInformer)
@@ -167,13 +171,6 @@ func main() {
 			logger.Fatalf("Failed to wait for cache at index %d to sync", i)
 		}
 	}
-
-	mc := custom_metrics.NewForConfigOrDie(cfg)
-	val, err := mc.NamespacedMetrics("testspace").GetForObject(v1alpha1.Kind("Revision"), "test", "concurrency")
-	if err != nil {
-		logger.Fatal(err)
-	}
-	logger.Infof("%v", val)
 
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -227,7 +224,8 @@ func buildRESTMapper(kubeClientSet kubernetes.Interface, stopCh <-chan struct{})
 	return rm
 }
 
-func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer) func(metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
+func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer, cmc custom_metrics.CustomMetricsClient) func(
+	metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
 	return func(metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
 		// Create a stats reporter which tags statistics by PA namespace, configuration name, and PA name.
 		reporter, err := autoscaler.NewStatsReporter(metric.Namespace,
@@ -242,7 +240,7 @@ func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer) f
 		}
 
 		return autoscaler.New(dynamicConfig, metric.Namespace,
-			reconciler.GetServingK8SServiceNameForObj(revName), endpointsInformer,
+			reconciler.GetServingK8SServiceNameForObj(revName), endpointsInformer, cmc,
 			metric.Spec.TargetConcurrency, reporter)
 	}
 }
