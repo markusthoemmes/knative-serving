@@ -14,7 +14,7 @@ import (
 )
 
 // GenVersion is the current version of codecgen.
-const GenVersion = 10
+const GenVersion = 8
 
 // This file is used to generate helper code for codecgen.
 // The values here i.e. genHelper(En|De)coder are not to be used directly by

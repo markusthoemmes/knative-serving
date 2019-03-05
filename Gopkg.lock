@@ -662,7 +662,7 @@
   revision = "b74ea40f39551d3c868e43d967670e6da582d4ea"
 
 [[projects]]
-  digest = "1:4c2988e9c7777badccfaf87473ab09dad9935c67811d2b51e143e959a934e5f3"
+  digest = "1:cf71ca07e2ee5914c776d9eaec4a7f63f4ddb013d55e39ffd5689fe4cd2df861"
   name = "github.com/kubernetes-incubator/custom-metrics-apiserver"
   packages = [
     "pkg/apiserver",
@@ -671,6 +671,7 @@
     "pkg/cmd/server",
     "pkg/dynamicmapper",
     "pkg/provider",
+    "pkg/provider/helpers",
     "pkg/registry/custom_metrics",
     "pkg/registry/external_metrics",
   ]
@@ -1590,7 +1591,7 @@
   version = "v1.10.2"
 
 [[projects]]
-  digest = "1:e369b69dbc472d31102749473e3649b150536af79bfef50e9ff49b86b80f4373"
+  digest = "1:3132728f8621d68c28e50e6e5454155a7ecc04a5b309e714133bb48159d65748"
   name = "k8s.io/metrics"
   packages = [
     "pkg/apis/custom_metrics",
@@ -1599,6 +1600,7 @@
     "pkg/apis/external_metrics",
     "pkg/apis/external_metrics/install",
     "pkg/apis/external_metrics/v1beta1",
+    "pkg/client/custom_metrics",
   ]
   pruneopts = "NUT"
   revision = "9aa1ab0459f06be9d4f59b83c50a9a17a1358806"
@@ -1610,6 +1612,7 @@
   input-imports = [
     "github.com/davecgh/go-spew/spew",
     "github.com/ghodss/yaml",
+    "github.com/golang/glog",
     "github.com/golang/protobuf/proto",
     "github.com/google/go-cmp/cmp",
     "github.com/google/go-cmp/cmp/cmpopts",
@@ -1674,6 +1677,8 @@
     "github.com/knative/test-infra/tools/webhook-apicoverage/view",
     "github.com/knative/test-infra/tools/webhook-apicoverage/webhook",
     "github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/cmd",
+    "github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/provider",
+    "github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/provider/helpers",
     "github.com/mattbaird/jsonpatch",
     "github.com/pkg/errors",
     "github.com/prometheus/client_model/go",
@@ -1746,6 +1751,8 @@
     "k8s.io/code-generator/cmd/defaulter-gen",
     "k8s.io/code-generator/cmd/informer-gen",
     "k8s.io/code-generator/cmd/lister-gen",
+    "k8s.io/metrics/pkg/apis/custom_metrics",
+    "k8s.io/metrics/pkg/client/custom_metrics",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

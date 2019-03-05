@@ -1,26 +1,45 @@
 package main
 
 import (
+	"flag"
+	"os"
+
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	fakeprov "github.com/knative/serving/pkg/metrics"
 	basecmd "github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/cmd"
+	"github.com/kubernetes-incubator/custom-metrics-apiserver/pkg/provider"
 )
 
-type YourAdapter struct {
+type SampleAdapter struct {
 	basecmd.AdapterBase
 }
 
-func main() {
-	// initialize the flags, with one custom flag for the message
-	cmd := &YourAdapter{}
+func (a *SampleAdapter) makeProviderOrDie() provider.CustomMetricsProvider {
+	client, err := a.DynamicClient()
+	if err != nil {
+		glog.Fatalf("unable to construct dynamic client: %v", err)
+	}
 
-	// provider := cmd.makeProviderOrDie()
-	//cmd.WithCustomMetrics(provider)
-	// you could also set up external metrics support,
-	// if your provider supported it:
-	// cmd.WithExternalMetrics(provider)
+	mapper, err := a.RESTMapper()
+	if err != nil {
+		glog.Fatalf("unable to construct discovery REST mapper: %v", err)
+	}
+
+	return fakeprov.NewFakeProvider(client, mapper)
+}
+
+func main() {
+
+	cmd := &SampleAdapter{}
+	cmd.Flags().AddGoFlagSet(flag.CommandLine) // make sure we get the glog flags
+	cmd.Flags().Parse(os.Args)
+
+	testProvider := cmd.makeProviderOrDie()
+	cmd.WithCustomMetrics(testProvider)
 
 	if err := cmd.Run(wait.NeverStop); err != nil {
-		panic(err)
+		glog.Fatalf("unable to run custom metrics adapter: %v", err)
 	}
 }

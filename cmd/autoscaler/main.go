@@ -27,6 +27,7 @@ import (
 	"github.com/knative/pkg/system"
 	"github.com/knative/pkg/version"
 	"github.com/knative/serving/pkg/apis/serving"
+	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/autoscaler"
 	"github.com/knative/serving/pkg/autoscaler/statserver"
 	clientset "github.com/knative/serving/pkg/client/clientset/versioned"
@@ -48,6 +49,8 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 const (
@@ -164,6 +167,13 @@ func main() {
 			logger.Fatalf("Failed to wait for cache at index %d to sync", i)
 		}
 	}
+
+	mc := custom_metrics.NewForConfigOrDie(cfg)
+	val, err := mc.NamespacedMetrics("testspace").GetForObject(v1alpha1.Kind("Revision"), "test", "concurrency")
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.Infof("%v", val)
 
 	var eg errgroup.Group
 	eg.Go(func() error {
