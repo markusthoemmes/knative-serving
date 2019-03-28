@@ -16,7 +16,16 @@ limitations under the License.
 
 package autoscaler
 
-import "go.uber.org/zap"
+import (
+	"context"
+	"errors"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/knative/pkg/logging"
+)
 
 type MetricClient interface {
 	Get(namespace, name string) (int64, error)
@@ -24,39 +33,99 @@ type MetricClient interface {
 }
 
 type MetricCollector interface {
-	StartCollecting(namespace, name string)
-	StopCollecting(namespace, name string)
+	StartCollecting(metric *Metric) error
+	StopCollecting(metric *Metric)
 	Shutdown()
 }
 
-func NewMetricCollector(logger *zap.SugaredLogger) MetricCollector {
-	return &collector{logger}
+func NewMetricCollector(logger *zap.SugaredLogger, statsScraperFactory StatsScraperFactory) MetricCollector {
+	return &collector{
+		logger:              logger,
+		statsScraperFactory: statsScraperFactory,
+		collections:         make(map[string]*collection),
+	}
 }
 
 type collector struct {
 	logger *zap.SugaredLogger
+
+	statsScraperFactory StatsScraperFactory
+
+	collections      map[string]*collection
+	collectionsMutex sync.RWMutex
 }
 
-func (c *collector) StartCollecting(namespace, name string) {
-	c.logger.Infof("Starting metric collection of %s/%s", namespace, name)
+func (c *collector) StartCollecting(metric *Metric) error {
+	c.collectionsMutex.Lock()
+	defer c.collectionsMutex.Unlock()
+
+	c.logger.Infof("Starting metric collection of %s/%s", metric.Namespace, metric.Name)
+
+	key := NewMetricKey(metric.Namespace, metric.Name)
+	if _, ok := c.collections[key]; ok {
+		return errors.New("collection already exists")
+	}
+
+	scraper, err := c.statsScraperFactory(metric, &DynamicConfig{})
+	if err != nil {
+		return err
+	}
+
+	c.collections[key] = newCollection(scraper, c.logger)
+	return nil
 }
 
-func (c *collector) StopCollecting(namespace, name string) {
-	c.logger.Infof("Stopping metric collection of %s/%s", namespace, name)
-	// Stop/Delete scraper
+func (c *collector) StopCollecting(metric *Metric) {
+	c.collectionsMutex.Lock()
+	defer c.collectionsMutex.Unlock()
+
+	c.logger.Infof("Stopping metric collection of %s/%s", metric.Namespace, metric.Name)
+
+	key := NewMetricKey(metric.Namespace, metric.Name)
+	if collection, ok := c.collections[key]; ok {
+		collection.Close()
+		delete(c.collections, key)
+	}
 }
 
 func (c *collector) Shutdown() {
+	c.collectionsMutex.Lock()
+	defer c.collectionsMutex.Unlock()
 
+	for _, collection := range c.collections {
+		collection.Close()
+	}
+	c.collections = nil
 }
 
 type collection struct {
+	logger *zap.SugaredLogger
 }
 
-func newCollection() *collection {
-	// setup scraper
-	// watch for websocket metrics
-	return &collection{}
+func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection {
+	collection := &collection{
+		logger: logger,
+	}
+
+	go func() {
+		scrapeTicker := time.NewTicker(scrapeTickInterval)
+		for {
+			select {
+			case <-scrapeTicker.C:
+				ctx := logging.WithLogger(context.Background(), logger)
+				statsCh := make(chan *StatMessage, 1)
+				scraper.Scrape(ctx, statsCh)
+				message := <-statsCh
+				collection.recordStat(message.Stat)
+			}
+		}
+	}()
+
+	return collection
+}
+
+func (c *collection) recordStat(stat Stat) {
+	c.logger.Infof("GOT STAT %v", stat)
 }
 
 func (c *collection) Close() {

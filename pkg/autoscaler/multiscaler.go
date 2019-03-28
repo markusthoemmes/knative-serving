@@ -210,7 +210,7 @@ func (m *MultiScaler) Delete(ctx context.Context, namespace, name string) error 
 	m.scalersMutex.Lock()
 	defer m.scalersMutex.Unlock()
 	if scaler, exists := m.scalers[key]; exists {
-		m.collector.StopCollecting(namespace, name)
+		m.collector.StopCollecting(&scaler.metric)
 		close(scaler.stopCh)
 		delete(m.scalers, key)
 	}
@@ -267,7 +267,7 @@ func (m *MultiScaler) createScaler(ctx context.Context, metric *Metric) (*scaler
 	}
 	runner.metric.Status.DesiredScale = -1
 
-	m.collector.StartCollecting(metric.Namespace, metric.Name)
+	m.collector.StartCollecting(metric)
 
 	ticker := time.NewTicker(m.dynConfig.Current().TickInterval)
 
