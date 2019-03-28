@@ -124,6 +124,7 @@ type MultiScaler struct {
 
 	uniScalerFactory    UniScalerFactory
 	statsScraperFactory StatsScraperFactory
+	collector           MetricCollector
 
 	logger *zap.SugaredLogger
 
@@ -138,6 +139,7 @@ func NewMultiScaler(
 	statsCh chan<- *StatMessage,
 	uniScalerFactory UniScalerFactory,
 	statsScraperFactory StatsScraperFactory,
+	collector MetricCollector,
 	logger *zap.SugaredLogger) *MultiScaler {
 	logger.Debugf("Creating MultiScaler with configuration %#v", dynConfig)
 	return &MultiScaler{
@@ -147,6 +149,7 @@ func NewMultiScaler(
 		dynConfig:           dynConfig,
 		uniScalerFactory:    uniScalerFactory,
 		statsScraperFactory: statsScraperFactory,
+		collector:           collector,
 		logger:              logger,
 	}
 }
@@ -207,6 +210,7 @@ func (m *MultiScaler) Delete(ctx context.Context, namespace, name string) error 
 	m.scalersMutex.Lock()
 	defer m.scalersMutex.Unlock()
 	if scaler, exists := m.scalers[key]; exists {
+		m.collector.StopCollecting(namespace, name)
 		close(scaler.stopCh)
 		delete(m.scalers, key)
 	}
@@ -262,6 +266,8 @@ func (m *MultiScaler) createScaler(ctx context.Context, metric *Metric) (*scaler
 		pokeCh: make(chan struct{}),
 	}
 	runner.metric.Status.DesiredScale = -1
+
+	m.collector.StartCollecting(metric.Namespace, metric.Name)
 
 	ticker := time.NewTicker(m.dynConfig.Current().TickInterval)
 
