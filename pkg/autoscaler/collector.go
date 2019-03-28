@@ -17,14 +17,11 @@ limitations under the License.
 package autoscaler
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
-
-	"github.com/knative/pkg/logging"
 )
 
 type MetricClient interface {
@@ -38,12 +35,23 @@ type MetricCollector interface {
 	Shutdown()
 }
 
-func NewMetricCollector(logger *zap.SugaredLogger, statsScraperFactory StatsScraperFactory) MetricCollector {
-	return &collector{
+func NewMetricCollector(logger *zap.SugaredLogger, statsScraperFactory StatsScraperFactory, statsCh chan *StatMessage) MetricCollector {
+	collector := &collector{
 		logger:              logger,
 		statsScraperFactory: statsScraperFactory,
 		collections:         make(map[string]*collection),
 	}
+
+	go func() {
+		for {
+			select {
+			case msg := <-statsCh:
+				collector.dispatchStat(msg)
+			}
+		}
+	}()
+
+	return collector
 }
 
 type collector struct {
@@ -98,8 +106,20 @@ func (c *collector) Shutdown() {
 	c.collections = nil
 }
 
+func (c *collector) dispatchStat(msg *StatMessage) {
+	c.collectionsMutex.RLock()
+	defer c.collectionsMutex.RUnlock()
+
+	if collection, ok := c.collections[msg.Key]; ok {
+		collection.recordStat(msg.Stat)
+	}
+}
+
 type collection struct {
 	logger *zap.SugaredLogger
+
+	buckets     map[time.Time]statsBucket
+	bucketMutex sync.RWMutex
 }
 
 func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection {
@@ -112,11 +132,13 @@ func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection 
 		for {
 			select {
 			case <-scrapeTicker.C:
-				ctx := logging.WithLogger(context.Background(), logger)
-				statsCh := make(chan *StatMessage, 1)
-				scraper.Scrape(ctx, statsCh)
-				message := <-statsCh
-				collection.recordStat(message.Stat)
+				message, err := scraper.Scrape()
+				if err != nil {
+					logger.Errorw("Failed to scrape metrics", zap.Error(err))
+				}
+				if message != nil {
+					collection.recordStat(message.Stat)
+				}
 			}
 		}
 	}()
@@ -125,7 +147,16 @@ func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection 
 }
 
 func (c *collection) recordStat(stat Stat) {
-	c.logger.Infof("GOT STAT %v", stat)
+	c.bucketMutex.Lock()
+	defer c.bucketMutex.Unlock()
+
+	bucketKey := stat.Time.Truncate(bucketSize)
+	bucket, ok := c.buckets[bucketKey]
+	if !ok {
+		bucket = statsBucket{}
+		c.buckets[bucketKey] = bucket
+	}
+	bucket.add(&stat)
 }
 
 func (c *collection) Close() {
