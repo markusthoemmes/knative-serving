@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/knative/pkg/logging"
-	"github.com/knative/pkg/logging/logkey"
 	kpa "github.com/knative/serving/pkg/apis/autoscaling/v1alpha1"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,9 +62,6 @@ type MetricStatus struct {
 
 // UniScaler records statistics for a particular Metric and proposes the scale for the Metric's target based on those statistics.
 type UniScaler interface {
-	// Record records the given statistics.
-	Record(context.Context, Stat)
-
 	// Scale either proposes a number of replicas or skips proposing. The proposal is requested at the given time.
 	// The returned boolean is true if and only if a proposal was returned.
 	Scale(context.Context, time.Time) (int32, bool)
@@ -290,32 +286,6 @@ func (m *MultiScaler) createScaler(ctx context.Context, metric *Metric) (*scaler
 		}
 	}()
 
-	scraper, err := m.statsScraperFactory(metric)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create a stats scraper for metric %q: %v", metric.Name, err)
-	}
-	scraperTicker := time.NewTicker(scrapeTickInterval)
-	go func() {
-		for {
-			select {
-			case <-m.scalersStopCh:
-				scraperTicker.Stop()
-				return
-			case <-stopCh:
-				scraperTicker.Stop()
-				return
-			case <-scraperTicker.C:
-				stat, err := scraper.Scrape()
-				if err != nil {
-					m.logger.Errorw("Failed to scrape metrics", zap.Error(err))
-				}
-				if stat != nil {
-					m.statsCh <- stat
-				}
-			}
-		}
-	}()
-
 	metricKey := NewMetricKey(metric.Namespace, metric.Name)
 	go func() {
 		for {
@@ -363,10 +333,6 @@ func (m *MultiScaler) RecordStat(key string, stat Stat) {
 
 	scaler, exists := m.scalers[key]
 	if exists {
-		logger := m.logger.With(zap.String(logkey.Key, key))
-		ctx := logging.WithLogger(context.Background(), logger)
-
-		scaler.scaler.Record(ctx, stat)
 		if scaler.getLatestScale() == 0 && stat.AverageConcurrentRequests != 0 {
 			scaler.pokeCh <- struct{}{}
 		}

@@ -104,6 +104,8 @@ type Autoscaler struct {
 	endpointsLister corev1listers.EndpointsLister
 	reporter        StatsReporter
 
+	metricClient MetricClient
+
 	// State in panic mode. Carries over multiple Scale calls.
 	panicTime    *time.Time
 	maxPanicPods int32
@@ -111,10 +113,6 @@ type Autoscaler struct {
 	// targetMutex guards the elements in the block below.
 	targetMutex sync.RWMutex
 	target      float64
-
-	// statsMutex guards the elements in the block below.
-	statsMutex sync.Mutex
-	bucketed   map[time.Time]statsBucket
 }
 
 // New creates a new instance of autoscaler
@@ -124,7 +122,8 @@ func New(
 	revisionService string,
 	endpointsInformer corev1informers.EndpointsInformer,
 	target float64,
-	reporter StatsReporter) (*Autoscaler, error) {
+	reporter StatsReporter,
+	metricClient MetricClient) (*Autoscaler, error) {
 	if endpointsInformer == nil {
 		return nil, errors.New("'endpointsEnformer' must not be nil")
 	}
@@ -134,8 +133,8 @@ func New(
 		revisionService: revisionService,
 		endpointsLister: endpointsInformer.Lister(),
 		target:          target,
-		bucketed:        make(map[time.Time]statsBucket),
 		reporter:        reporter,
+		metricClient:    metricClient,
 	}, nil
 }
 
@@ -145,26 +144,6 @@ func (a *Autoscaler) Update(spec MetricSpec) error {
 	defer a.targetMutex.Unlock()
 	a.target = spec.TargetConcurrency
 	return nil
-}
-
-// Record a data point.
-func (a *Autoscaler) Record(ctx context.Context, stat Stat) {
-	if stat.Time == nil {
-		logger := logging.FromContext(ctx)
-		logger.Errorf("Missing time from stat: %+v", stat)
-		return
-	}
-
-	a.statsMutex.Lock()
-	defer a.statsMutex.Unlock()
-
-	bucketKey := stat.Time.Truncate(bucketSize)
-	bucket, ok := a.bucketed[bucketKey]
-	if !ok {
-		bucket = statsBucket{}
-		a.bucketed[bucketKey] = bucket
-	}
-	bucket.add(&stat)
 }
 
 // Scale calculates the desired scale based on current statistics given the current time.
@@ -181,14 +160,8 @@ func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 
 	config := a.Current()
 
-	observedStableConcurrency, observedPanicConcurrency, lastBucket := a.aggregateData(now, config.StableWindow, config.PanicWindow)
-	if len(a.bucketed) == 0 {
-		logger.Debug("No data to scale on.")
-		return 0, false
-	}
-
-	// Log system totals.
-	logger.Debugf("Current concurrent clients: %0.3f", lastBucket.concurrency())
+	observedStableConcurrency, _ := a.metricClient.GetStableConcurrency(a.namespace, a.revisionService)
+	observedPanicConcurrency, _ := a.metricClient.GetPanicConcurrency(a.namespace, a.revisionService)
 
 	target := a.targetConcurrency()
 	// Desired pod count is observed concurrency of the revision over desired (stable) concurrency per pod.
@@ -240,7 +213,7 @@ func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 // aggregateData aggregates bucketed stats over the stableWindow and panicWindow
 // respectively and returns the observedStableConcurrency, observedPanicConcurrency
 // and the last bucket that was aggregated.
-func (a *Autoscaler) aggregateData(now time.Time, stableWindow, panicWindow time.Duration) (
+/*func (a *Autoscaler) aggregateData(now time.Time, stableWindow, panicWindow time.Duration) (
 	stableConcurrency float64, panicConcurrency float64, lastBucket statsBucket) {
 	a.statsMutex.Lock()
 	defer a.statsMutex.Unlock()
@@ -281,7 +254,7 @@ func (a *Autoscaler) aggregateData(now time.Time, stableWindow, panicWindow time
 	}
 
 	return stableConcurrency, panicConcurrency, lastBucket
-}
+}*/
 
 func (a *Autoscaler) targetConcurrency() float64 {
 	a.targetMutex.RLock()

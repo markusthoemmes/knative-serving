@@ -25,14 +25,16 @@ import (
 )
 
 type MetricClient interface {
-	Get(namespace, name string) (int64, error)
-	Watch(namespace, name string, watchFn func(int64))
+	GetStableConcurrency(namespace, name string) (float64, error)
+	GetPanicConcurrency(namespace, name string) (float64, error)
 }
 
 type MetricCollector interface {
 	StartCollecting(metric *Metric) error
 	StopCollecting(metric *Metric)
 	Shutdown()
+
+	MetricClient
 }
 
 func NewMetricCollector(logger *zap.SugaredLogger, statsScraperFactory StatsScraperFactory, statsCh chan *StatMessage) MetricCollector {
@@ -83,6 +85,10 @@ func (c *collector) StartCollecting(metric *Metric) error {
 	return nil
 }
 
+func (c *collection) UpdateMetric(metric *Metric) {
+	// Update window sizes for example.
+}
+
 func (c *collector) StopCollecting(metric *Metric) {
 	c.collectionsMutex.Lock()
 	defer c.collectionsMutex.Unlock()
@@ -91,7 +97,7 @@ func (c *collector) StopCollecting(metric *Metric) {
 
 	key := NewMetricKey(metric.Namespace, metric.Name)
 	if collection, ok := c.collections[key]; ok {
-		collection.Close()
+		collection.shutdown()
 		delete(c.collections, key)
 	}
 }
@@ -101,9 +107,17 @@ func (c *collector) Shutdown() {
 	defer c.collectionsMutex.Unlock()
 
 	for _, collection := range c.collections {
-		collection.Close()
+		collection.shutdown()
 	}
 	c.collections = nil
+}
+
+func (c *collector) GetStableConcurrency(namespace, name string) (float64, error) {
+	return 200.0, nil
+}
+
+func (c *collector) GetPanicConcurrency(namespace, name string) (float64, error) {
+	return 200.0, nil
 }
 
 func (c *collector) dispatchStat(msg *StatMessage) {
@@ -118,32 +132,42 @@ func (c *collector) dispatchStat(msg *StatMessage) {
 type collection struct {
 	logger *zap.SugaredLogger
 
+	stopCh chan struct{}
+	grp    sync.WaitGroup
+
 	buckets     map[time.Time]statsBucket
 	bucketMutex sync.RWMutex
 }
 
 func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection {
-	collection := &collection{
-		logger: logger,
+	c := &collection{
+		logger:  logger,
+		stopCh:  make(chan struct{}),
+		buckets: make(map[time.Time]statsBucket),
 	}
 
+	c.grp.Add(1)
 	go func() {
+		defer c.grp.Done()
+
 		scrapeTicker := time.NewTicker(scrapeTickInterval)
 		for {
 			select {
+			case <-c.stopCh:
+				return
 			case <-scrapeTicker.C:
 				message, err := scraper.Scrape()
 				if err != nil {
 					logger.Errorw("Failed to scrape metrics", zap.Error(err))
 				}
 				if message != nil {
-					collection.recordStat(message.Stat)
+					c.recordStat(message.Stat)
 				}
 			}
 		}
 	}()
 
-	return collection
+	return c
 }
 
 func (c *collection) recordStat(stat Stat) {
@@ -159,6 +183,7 @@ func (c *collection) recordStat(stat Stat) {
 	bucket.add(&stat)
 }
 
-func (c *collection) Close() {
-	// shutdown scraper
+func (c *collection) shutdown() {
+	close(c.stopCh)
+	c.grp.Wait()
 }

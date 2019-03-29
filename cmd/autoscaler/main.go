@@ -91,12 +91,12 @@ func main() {
 	hpaInformer := kubeInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers()
 
 	// Set up metric collector
-	collector := autoscaler.NewMetricCollector(logger, statsScraperFactoryFunc(endpointsInformer))
+	collector := autoscaler.NewMetricCollector(logger, statsScraperFactoryFunc(endpointsInformer), statsCh)
 
 	// Set up scalers.
 	// uniScalerFactory depends endpointsInformer to be set.
 	multiScaler := autoscaler.NewMultiScaler(
-		dynConfig, stopCh, statsCh, uniScalerFactoryFunc(endpointsInformer), statsScraperFactoryFunc(endpointsInformer.Lister()), logger)
+		dynConfig, stopCh, statsCh, uniScalerFactoryFunc(endpointsInformer, collector), statsScraperFactoryFunc(endpointsInformer.Lister()), collector, logger)
 	kpaScaler := kpa.NewKPAScaler(opt.ServingClientSet, opt.ScaleClientSet, logger, opt.ConfigMapWatcher)
 
 	controllers := []*controller.Impl{
@@ -180,7 +180,7 @@ func scalerConfig(logger *zap.SugaredLogger) *autoscaler.DynamicConfig {
 	return dynConfig
 }
 
-func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer) func(metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
+func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer, metricClient autoscaler.MetricClient) func(metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
 	return func(metric *autoscaler.Metric, dynamicConfig *autoscaler.DynamicConfig) (autoscaler.UniScaler, error) {
 		// Create a stats reporter which tags statistics by PA namespace, configuration name, and PA name.
 		reporter, err := autoscaler.NewStatsReporter(metric.Namespace,
@@ -196,7 +196,7 @@ func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer) f
 
 		return autoscaler.New(dynamicConfig, metric.Namespace,
 			reconciler.GetServingK8SServiceNameForObj(revName), endpointsInformer,
-			metric.Spec.TargetConcurrency, reporter)
+			metric.Spec.TargetConcurrency, reporter, metricClient)
 	}
 }
 
