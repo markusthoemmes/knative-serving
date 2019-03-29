@@ -325,16 +325,3 @@ func (m *MultiScaler) tickScaler(ctx context.Context, scaler UniScaler, scaleCha
 		scaleChan <- desiredScale
 	}
 }
-
-// RecordStat records some statistics for the given Metric.
-func (m *MultiScaler) RecordStat(key string, stat Stat) {
-	m.scalersMutex.RLock()
-	defer m.scalersMutex.RUnlock()
-
-	scaler, exists := m.scalers[key]
-	if exists {
-		if scaler.getLatestScale() == 0 && stat.AverageConcurrentRequests != 0 {
-			scaler.pokeCh <- struct{}{}
-		}
-	}
-}

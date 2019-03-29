@@ -18,6 +18,7 @@ package autoscaler
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ type MetricClient interface {
 
 type MetricCollector interface {
 	StartCollecting(metric *Metric) error
+	UpdateMetadata(metric *Metric)
 	StopCollecting(metric *Metric)
 	Shutdown()
 
@@ -85,7 +87,7 @@ func (c *collector) StartCollecting(metric *Metric) error {
 	return nil
 }
 
-func (c *collection) UpdateMetric(metric *Metric) {
+func (c *collector) UpdateMetadata(metric *Metric) {
 	// Update window sizes for example.
 }
 
@@ -113,11 +115,31 @@ func (c *collector) Shutdown() {
 }
 
 func (c *collector) GetStableConcurrency(namespace, name string) (float64, error) {
-	return 200.0, nil
+	c.collectionsMutex.RLock()
+	defer c.collectionsMutex.RUnlock()
+
+	key := NewMetricKey(namespace, name)
+	collection, ok := c.collections[key]
+	if !ok {
+		return 0.0, fmt.Errorf("no metrics available")
+	}
+
+	stable, _ := collection.calculateConcurrencies(time.Now())
+	return stable, nil
 }
 
 func (c *collector) GetPanicConcurrency(namespace, name string) (float64, error) {
-	return 200.0, nil
+	c.collectionsMutex.RLock()
+	defer c.collectionsMutex.RUnlock()
+
+	key := NewMetricKey(namespace, name)
+	collection, ok := c.collections[key]
+	if !ok {
+		return 0.0, fmt.Errorf("no metrics available")
+	}
+
+	_, panic := collection.calculateConcurrencies(time.Now())
+	return panic, nil
 }
 
 func (c *collector) dispatchStat(msg *StatMessage) {
@@ -137,13 +159,18 @@ type collection struct {
 
 	buckets     map[time.Time]statsBucket
 	bucketMutex sync.RWMutex
+
+	stableWindow time.Duration
+	panicWindow  time.Duration
 }
 
 func newCollection(scraper StatsScraper, logger *zap.SugaredLogger) *collection {
 	c := &collection{
-		logger:  logger,
-		stopCh:  make(chan struct{}),
-		buckets: make(map[time.Time]statsBucket),
+		logger:       logger,
+		stopCh:       make(chan struct{}),
+		buckets:      make(map[time.Time]statsBucket),
+		stableWindow: 60 * time.Second,
+		panicWindow:  6 * time.Second,
 	}
 
 	c.grp.Add(1)
@@ -183,7 +210,99 @@ func (c *collection) recordStat(stat Stat) {
 	bucket.add(&stat)
 }
 
+func (c *collection) calculateConcurrencies(now time.Time) (stableConcurrency float64, panicConcurrency float64) {
+	c.bucketMutex.Lock()
+	defer c.bucketMutex.Unlock()
+
+	var (
+		stableBuckets float64
+		stableTotal   float64
+
+		panicBuckets float64
+		panicTotal   float64
+	)
+	for bucketTime, bucket := range c.buckets {
+		if !bucketTime.Add(c.panicWindow).Before(now) {
+			panicBuckets++
+			panicTotal += bucket.concurrency()
+		}
+
+		if !bucketTime.Add(c.stableWindow).Before(now) {
+			stableBuckets++
+			stableTotal += bucket.concurrency()
+		} else {
+			delete(c.buckets, bucketTime)
+		}
+	}
+
+	if stableBuckets > 0 {
+		stableConcurrency = stableTotal / stableBuckets
+	}
+	if panicBuckets > 0 {
+		panicConcurrency = panicTotal / panicBuckets
+	}
+
+	return
+}
+
 func (c *collection) shutdown() {
 	close(c.stopCh)
 	c.grp.Wait()
+}
+
+// Stat defines a single measurement at a point in time
+type Stat struct {
+	// The time the data point was collected on the pod.
+	Time *time.Time
+
+	// The unique identity of this pod.  Used to count how many pods
+	// are contributing to the metrics.
+	PodName string
+
+	// Average number of requests currently being handled by this pod.
+	AverageConcurrentRequests float64
+
+	// Part of AverageConcurrentRequests, for requests going through a proxy.
+	AverageProxiedConcurrentRequests float64
+
+	// Number of requests received since last Stat (approximately QPS).
+	RequestCount int32
+
+	// Part of RequestCount, for requests going through a proxy.
+	ProxiedRequestCount int32
+}
+
+// StatMessage wraps a Stat with identifying information so it can be routed
+// to the correct receiver.
+type StatMessage struct {
+	Key  string
+	Stat Stat
+}
+
+// statsBucket keeps all the stats that fall into a defined bucket.
+type statsBucket map[string][]*Stat
+
+// add adds a Stat to the bucket. Stats from the same pod will be
+// collapsed.
+func (b statsBucket) add(stat *Stat) {
+	b[stat.PodName] = append(b[stat.PodName], stat)
+}
+
+// concurrency calculates the overall concurrency as measured by this
+// bucket. All stats that belong to the same pod will be averaged.
+// The overall concurrency is the sum of the measured concurrency of all
+// pods (including activator metrics).
+func (b statsBucket) concurrency() float64 {
+	var total float64
+	for _, podStats := range b {
+		var subtotal float64
+		for _, stat := range podStats {
+			// Proxied requests have been counted at the activator. Subtract
+			// AverageProxiedConcurrentRequests to avoid double counting.
+			subtotal += stat.AverageConcurrentRequests - stat.AverageProxiedConcurrentRequests
+		}
+		total += subtotal / float64(len(podStats))
+	}
+
+	return total
 }

@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/knative/serving/pkg/reconciler"
+
 	"github.com/knative/pkg/logging"
 	"go.uber.org/zap"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,76 +33,15 @@ import (
 )
 
 const (
-	// ActivatorPodName defines the pod name of the activator
-	// as defined in the metrics it sends.
-	ActivatorPodName string = "activator"
-
 	// bucketSize is the size of the buckets of stats we create.
 	bucketSize time.Duration = 2 * time.Second
 )
-
-// Stat defines a single measurement at a point in time
-type Stat struct {
-	// The time the data point was collected on the pod.
-	Time *time.Time
-
-	// The unique identity of this pod.  Used to count how many pods
-	// are contributing to the metrics.
-	PodName string
-
-	// Average number of requests currently being handled by this pod.
-	AverageConcurrentRequests float64
-
-	// Part of AverageConcurrentRequests, for requests going through a proxy.
-	AverageProxiedConcurrentRequests float64
-
-	// Number of requests received since last Stat (approximately QPS).
-	RequestCount int32
-
-	// Part of RequestCount, for requests going through a proxy.
-	ProxiedRequestCount int32
-}
-
-// StatMessage wraps a Stat with identifying information so it can be routed
-// to the correct receiver.
-type StatMessage struct {
-	Key  string
-	Stat Stat
-}
-
-// statsBucket keeps all the stats that fall into a defined bucket.
-type statsBucket map[string][]*Stat
-
-// add adds a Stat to the bucket. Stats from the same pod will be
-// collapsed.
-func (b statsBucket) add(stat *Stat) {
-	b[stat.PodName] = append(b[stat.PodName], stat)
-}
-
-// concurrency calculates the overall concurrency as measured by this
-// bucket. All stats that belong to the same pod will be averaged.
-// The overall concurrency is the sum of the measured concurrency of all
-// pods (including activator metrics).
-func (b statsBucket) concurrency() float64 {
-	var total float64
-	for _, podStats := range b {
-		var subtotal float64
-		for _, stat := range podStats {
-			// Proxied requests have been counted at the activator. Subtract
-			// AverageProxiedConcurrentRequests to avoid double counting.
-			subtotal += stat.AverageConcurrentRequests - stat.AverageProxiedConcurrentRequests
-		}
-		total += subtotal / float64(len(podStats))
-	}
-
-	return total
-}
 
 // Autoscaler stores current state of an instance of an autoscaler
 type Autoscaler struct {
 	*DynamicConfig
 	namespace       string
-	revisionService string
+	revisionName    string
 	endpointsLister corev1listers.EndpointsLister
 	reporter        StatsReporter
 
@@ -119,7 +60,7 @@ type Autoscaler struct {
 func New(
 	dynamicConfig *DynamicConfig,
 	namespace string,
-	revisionService string,
+	revisionName string,
 	endpointsInformer corev1informers.EndpointsInformer,
 	target float64,
 	reporter StatsReporter,
@@ -130,7 +71,7 @@ func New(
 	return &Autoscaler{
 		DynamicConfig:   dynamicConfig,
 		namespace:       namespace,
-		revisionService: revisionService,
+		revisionName:    revisionName,
 		endpointsLister: endpointsInformer.Lister(),
 		target:          target,
 		reporter:        reporter,
@@ -150,7 +91,7 @@ func (a *Autoscaler) Update(spec MetricSpec) error {
 func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 	logger := logging.FromContext(ctx)
 
-	originalReadyPodsCount, err := readyPodsCountOfEndpoints(a.endpointsLister, a.namespace, a.revisionService)
+	originalReadyPodsCount, err := readyPodsCountOfEndpoints(a.endpointsLister, a.namespace, reconciler.GetServingK8SServiceNameForObj(a.revisionName))
 	if err != nil {
 		logger.Errorw("Failed to get Endpoints via K8S Lister", zap.Error(err))
 		return 0, false
@@ -160,8 +101,14 @@ func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 
 	config := a.Current()
 
-	observedStableConcurrency, _ := a.metricClient.GetStableConcurrency(a.namespace, a.revisionService)
-	observedPanicConcurrency, _ := a.metricClient.GetPanicConcurrency(a.namespace, a.revisionService)
+	observedStableConcurrency, err := a.metricClient.GetStableConcurrency(a.namespace, a.revisionName)
+	if err != nil {
+		logger.Errorw("Failed to fetch stable concurrency", zap.Error(err))
+	}
+	observedPanicConcurrency, err := a.metricClient.GetPanicConcurrency(a.namespace, a.revisionName)
+	if err != nil {
+		logger.Errorw("Failed to fetch panic concurrency", zap.Error(err))
+	}
 
 	target := a.targetConcurrency()
 	// Desired pod count is observed concurrency of the revision over desired (stable) concurrency per pod.
@@ -209,52 +156,6 @@ func (a *Autoscaler) Scale(ctx context.Context, now time.Time) (int32, bool) {
 	a.reporter.ReportDesiredPodCount(int64(desiredPodCount))
 	return desiredPodCount, true
 }
-
-// aggregateData aggregates bucketed stats over the stableWindow and panicWindow
-// respectively and returns the observedStableConcurrency, observedPanicConcurrency
-// and the last bucket that was aggregated.
-/*func (a *Autoscaler) aggregateData(now time.Time, stableWindow, panicWindow time.Duration) (
-	stableConcurrency float64, panicConcurrency float64, lastBucket statsBucket) {
-	a.statsMutex.Lock()
-	defer a.statsMutex.Unlock()
-
-	var (
-		stableBuckets float64
-		stableTotal   float64
-
-		panicBuckets float64
-		panicTotal   float64
-
-		lastBucketTime time.Time
-	)
-	for bucketTime, bucket := range a.bucketed {
-		if !bucketTime.Add(panicWindow).Before(now) {
-			panicBuckets++
-			panicTotal += bucket.concurrency()
-		}
-
-		if !bucketTime.Add(stableWindow).Before(now) {
-			stableBuckets++
-			stableTotal += bucket.concurrency()
-		} else {
-			delete(a.bucketed, bucketTime)
-		}
-
-		if bucketTime.After(lastBucketTime) {
-			lastBucketTime = bucketTime
-			lastBucket = bucket
-		}
-	}
-
-	if stableBuckets > 0 {
-		stableConcurrency = stableTotal / stableBuckets
-	}
-	if panicBuckets > 0 {
-		panicConcurrency = panicTotal / panicBuckets
-	}
-
-	return stableConcurrency, panicConcurrency, lastBucket
-}*/
 
 func (a *Autoscaler) targetConcurrency() float64 {
 	a.targetMutex.RLock()

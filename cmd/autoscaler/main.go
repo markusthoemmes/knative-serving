@@ -131,16 +131,6 @@ func main() {
 		return statsServer.ListenAndServe()
 	})
 
-	go func() {
-		for {
-			sm, ok := <-statsCh
-			if !ok {
-				break
-			}
-			multiScaler.RecordStat(sm.Key, sm.Stat)
-		}
-	}()
-
 	egCh := make(chan struct{})
 
 	go func() {
@@ -194,8 +184,7 @@ func uniScalerFactoryFunc(endpointsInformer corev1informers.EndpointsInformer, m
 			return nil, fmt.Errorf("no Revision label found in Metric: %v", metric)
 		}
 
-		return autoscaler.New(dynamicConfig, metric.Namespace,
-			reconciler.GetServingK8SServiceNameForObj(revName), endpointsInformer,
+		return autoscaler.New(dynamicConfig, metric.Namespace, revName, endpointsInformer,
 			metric.Spec.TargetConcurrency, reporter, metricClient)
 	}
 }
