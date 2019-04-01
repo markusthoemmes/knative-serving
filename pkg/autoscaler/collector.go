@@ -78,7 +78,7 @@ func (c *collector) StartCollecting(metric *Metric) error {
 		return errors.New("collection already exists")
 	}
 
-	scraper, err := c.statsScraperFactory(metric, &DynamicConfig{})
+	scraper, err := c.statsScraperFactory(metric)
 	if err != nil {
 		return err
 	}
