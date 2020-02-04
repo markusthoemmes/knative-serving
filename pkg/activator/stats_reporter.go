@@ -56,7 +56,7 @@ type StatsReporter interface {
 // RevisionStatsReporter defines the interface for sending revision specific metrics.
 type RevisionStatsReporter interface {
 	ReportRequestConcurrency(v int64)
-	ReportRequestCount(responseCode, numTries int)
+	ReportRequestCount(responseCode int)
 	ReportResponseTime(responseCode int, d time.Duration)
 }
 
@@ -140,7 +140,7 @@ func (r *revisionReporter) ReportRequestConcurrency(v int64) {
 }
 
 // ReportRequestCount captures request count.
-func (r *revisionReporter) ReportRequestCount(responseCode, numTries int) {
+func (r *revisionReporter) ReportRequestCount(responseCode int) {
 	if r.ctx == nil {
 		return
 	}
@@ -148,9 +148,7 @@ func (r *revisionReporter) ReportRequestCount(responseCode, numTries int) {
 	// It's safe to ignore the error as the tags are guaranteed to pass the checks in all cases.
 	ctx, _ := tag.New(
 		r.ctx,
-		tag.Upsert(metrics.ResponseCodeKey, strconv.Itoa(responseCode)),
-		tag.Upsert(metrics.ResponseCodeClassKey, responseCodeClass(responseCode)),
-		tag.Upsert(metrics.NumTriesKey, strconv.Itoa(numTries)))
+		responseCodeMutators(responseCode)...)
 
 	pkgmetrics.Record(ctx, requestCountM.M(1))
 }
@@ -164,15 +162,49 @@ func (r *revisionReporter) ReportResponseTime(responseCode int, d time.Duration)
 	// It's safe to ignore the error as the tags are guaranteed to pass the checks in all cases.
 	ctx, _ := tag.New(
 		r.ctx,
-		tag.Upsert(metrics.ResponseCodeKey, strconv.Itoa(responseCode)),
-		tag.Upsert(metrics.ResponseCodeClassKey, responseCodeClass(responseCode)))
+		responseCodeMutators(responseCode)...)
 
 	pkgmetrics.Record(ctx, responseTimeInMsecM.M(float64(d.Milliseconds())))
 }
 
-// responseCodeClass converts response code to a string of response code class.
-// e.g. The response code class is "5xx" for response code 503.
-func responseCodeClass(responseCode int) string {
-	// Get the hundred digit of the response code and concatenate "xx".
-	return strconv.Itoa(responseCode/100) + "xx"
+func responseCodeMutators(responseCode int) []tag.Mutator {
+	return tags[responseCode]
+}
+
+// Preallocate all necessary mutators for all possible status codes.
+var tags = map[int][]tag.Mutator{}
+
+func init() {
+	// This should get even the inofficial ones, per https://en.wikipedia.org/wiki/List_of_HTTP_status_codes.
+	for i := 100; i < 600; i++ {
+		tags[i] = []tag.Mutator{
+			tag.Upsert(metrics.ResponseCodeKey, strconv.Itoa(i)),
+			responseCodeClassMutator(i),
+		}
+	}
+}
+
+var (
+	class1xx = tag.Upsert(metrics.ResponseCodeClassKey, "1xx")
+	class2xx = tag.Upsert(metrics.ResponseCodeClassKey, "2xx")
+	class3xx = tag.Upsert(metrics.ResponseCodeClassKey, "3xx")
+	class4xx = tag.Upsert(metrics.ResponseCodeClassKey, "4xx")
+	class5xx = tag.Upsert(metrics.ResponseCodeClassKey, "5xx")
+)
+
+func responseCodeClassMutator(responseCode int) tag.Mutator {
+	switch responseCode / 100 {
+	case 1:
+		return class1xx
+	case 2:
+		return class2xx
+	case 3:
+		return class3xx
+	case 4:
+		return class4xx
+	case 5:
+		return class5xx
+	default:
+		return class5xx
+	}
 }
