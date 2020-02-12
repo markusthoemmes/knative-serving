@@ -32,10 +32,10 @@ KNATIVE_CODEGEN_PKG=${KNATIVE_CODEGEN_PKG:-$(cd ${REPO_ROOT_DIR}; ls -d -1 $(dir
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
-${CODEGEN_PKG}/generate-groups.sh "deepcopy,client,informer,lister" \
-  knative.dev/serving/pkg/client knative.dev/serving/pkg/apis \
-  "serving:v1alpha1,v1beta1,v1 autoscaling:v1alpha1 networking:v1alpha1" \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
+#${CODEGEN_PKG}/generate-groups.sh "deepcopy,client,informer,lister" \
+#  knative.dev/serving/pkg/client knative.dev/serving/pkg/apis \
+#  "serving:v1alpha1,v1beta1,v1 autoscaling:v1alpha1 networking:v1alpha1" \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Knative Injection
 ${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
@@ -44,46 +44,46 @@ ${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
   --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Generate our own client for istio (otherwise injection won't work)
-${CODEGEN_PKG}/generate-groups.sh "client,informer,lister" \
-  knative.dev/serving/pkg/client/istio istio.io/client-go/pkg/apis \
-  "networking:v1alpha3" \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
+#${CODEGEN_PKG}/generate-groups.sh "client,informer,lister" \
+#  knative.dev/serving/pkg/client/istio istio.io/client-go/pkg/apis \
+#  "networking:v1alpha3" \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Knative Injection (for istio)
-${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
-  knative.dev/serving/pkg/client/istio istio.io/client-go/pkg/apis \
-  "networking:v1alpha3" \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
+#${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
+#  knative.dev/serving/pkg/client/istio istio.io/client-go/pkg/apis \
+#  "networking:v1alpha3" \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Generate our own client for cert-manager (otherwise injection won't work)
-${CODEGEN_PKG}/generate-groups.sh "deepcopy,client,informer,lister" \
-  knative.dev/serving/pkg/client/certmanager github.com/jetstack/cert-manager/pkg/apis \
-  "certmanager:v1alpha2 acme:v1alpha2" \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
+#${CODEGEN_PKG}/generate-groups.sh "deepcopy,client,informer,lister" \
+#  knative.dev/serving/pkg/client/certmanager github.com/jetstack/cert-manager/pkg/apis \
+#  "certmanager:v1alpha2 acme:v1alpha2" \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Knative Injection (for cert-manager)
-${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
-  knative.dev/serving/pkg/client/certmanager github.com/jetstack/cert-manager/pkg/apis \
-  "certmanager:v1alpha2 acme:v1alpha2" \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
+#${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
+#  knative.dev/serving/pkg/client/certmanager github.com/jetstack/cert-manager/pkg/apis \
+#  "certmanager:v1alpha2 acme:v1alpha2" \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
 
 # Depends on generate-groups.sh to install bin/deepcopy-gen
-${GOPATH}/bin/deepcopy-gen \
-  -O zz_generated.deepcopy \
-  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt \
-  -i knative.dev/serving/pkg/apis/config \
-  -i knative.dev/serving/pkg/reconciler/ingress/config \
-  -i knative.dev/serving/pkg/reconciler/certificate/config \
-  -i knative.dev/serving/pkg/reconciler/gc/config \
-  -i knative.dev/serving/pkg/reconciler/revision/config \
-  -i knative.dev/serving/pkg/reconciler/route/config \
-  -i knative.dev/serving/pkg/activator/config \
-  -i knative.dev/serving/pkg/autoscaler \
-  -i knative.dev/serving/pkg/deployment \
-  -i knative.dev/serving/pkg/gc \
-  -i knative.dev/serving/pkg/logging \
-  -i knative.dev/serving/pkg/metrics \
-  -i knative.dev/serving/pkg/network
+#${GOPATH}/bin/deepcopy-gen \
+#  -O zz_generated.deepcopy \
+#  --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt \
+#  -i knative.dev/serving/pkg/apis/config \
+#  -i knative.dev/serving/pkg/reconciler/ingress/config \
+#  -i knative.dev/serving/pkg/reconciler/certificate/config \
+#  -i knative.dev/serving/pkg/reconciler/gc/config \
+#  -i knative.dev/serving/pkg/reconciler/revision/config \
+#  -i knative.dev/serving/pkg/reconciler/route/config \
+#  -i knative.dev/serving/pkg/activator/config \
+#  -i knative.dev/serving/pkg/autoscaler \
+#  -i knative.dev/serving/pkg/deployment \
+#  -i knative.dev/serving/pkg/gc \
+#  -i knative.dev/serving/pkg/logging \
+#  -i knative.dev/serving/pkg/metrics \
+#  -i knative.dev/serving/pkg/network
 
 # Make sure our dependencies are up-to-date
-${REPO_ROOT_DIR}/hack/update-deps.sh
+#${REPO_ROOT_DIR}/hack/update-deps.sh

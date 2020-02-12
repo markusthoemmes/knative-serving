@@ -27,6 +27,7 @@ import (
 
 // +genclient
 // +genreconciler
+// +genreconcilefunc
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServerlessService is a proxy for the K8s service objects containing the

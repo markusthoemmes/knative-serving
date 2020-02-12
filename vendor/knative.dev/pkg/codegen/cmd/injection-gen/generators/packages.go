@@ -87,6 +87,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		var typesWithInformers []*types.Type
 		var duckTypes []*types.Type
 		var reconcilerTypes []*types.Type
+		var reconcilerFuncTypes []*types.Type
 		for _, t := range p.Types {
 			tags := MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			if tags.NeedsInformerInjection() {
@@ -97,6 +98,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			if tags.NeedsReconciler() {
 				reconcilerTypes = append(reconcilerTypes, t)
+			}
+			if tags.NeedsReconcileFunc() {
+				reconcilerFuncTypes = append(reconcilerFuncTypes, t)
 			}
 		}
 
@@ -133,6 +137,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// Generate a reconciler and controller for each type.
 			packageList = append(packageList, reconcilerPackages(versionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, reconcilerTypes, customArgs)...)
 		}
+
+		if len(reconcilerFuncTypes) != 0 {
+			orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
+			reconcilerTypes = orderer.OrderTypes(reconcilerFuncTypes)
+
+			// Generate a reconciler and controller for each type.
+			packageList = append(packageList, reconcilerFuncPackages(versionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, reconcilerTypes, customArgs)...)
+		}
 	}
 
 	return packageList
@@ -142,8 +154,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 type Tags struct {
 	util.Tags
 
-	GenerateDuck       bool
-	GenerateReconciler bool
+	GenerateDuck          bool
+	GenerateReconciler    bool
+	GenerateReconcileFunc bool
 }
 
 func (t Tags) NeedsInformerInjection() bool {
@@ -158,6 +171,10 @@ func (t Tags) NeedsReconciler() bool {
 	return t.GenerateReconciler
 }
 
+func (t Tags) NeedsReconcileFunc() bool {
+	return t.GenerateReconcileFunc
+}
+
 // MustParseClientGenTags calls ParseClientGenTags but instead of returning error it panics.
 func MustParseClientGenTags(lines []string) Tags {
 	ret := Tags{
@@ -168,6 +185,7 @@ func MustParseClientGenTags(lines []string) Tags {
 	// log.Printf("GOT values %v", values)
 	_, ret.GenerateDuck = values["genduck"]
 	_, ret.GenerateReconciler = values["genreconciler"]
+	_, ret.GenerateReconcileFunc = values["genreconcilefunc"]
 
 	return ret
 }
@@ -497,6 +515,48 @@ func reconcilerPackages(basePackage string, groupPkgName string, gv clientgentyp
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
 				tags := MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 				return tags.NeedsReconciler()
+			},
+		})
+	}
+	return vers
+}
+
+func reconcilerFuncPackages(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, customArgs *informergenargs.CustomArgs) []generator.Package {
+	packagePath := filepath.Join(basePackage, "reconciler", groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
+
+	vers := make([]generator.Package, 0, len(typesToGenerate))
+
+	for _, t := range typesToGenerate {
+		// Fix for golang iterator bug.
+		t := t
+
+		packagePath := filepath.Join(packagePath, strings.ToLower(t.Name.Name))
+
+		clientPackagePath := filepath.Join(basePackage, "client")
+		informerPackagePath := filepath.Join(basePackage, "informers", groupPkgName, strings.ToLower(gv.Version.NonEmpty()), strings.ToLower(t.Name.Name))
+
+		// Controller
+		vers = append(vers, &generator.DefaultPackage{
+			PackageName: strings.ToLower(t.Name.Name),
+			PackagePath: packagePath,
+			HeaderText:  boilerplate,
+			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+				// Impl
+				generators = append(generators, &reconcilerFuncGenerator{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "reconcile",
+					},
+					outputPackage:       packagePath,
+					imports:             generator.NewImportTracker(),
+					clientPkg:           clientPackagePath,
+					informerPackagePath: informerPackagePath,
+				})
+
+				return generators
+			},
+			FilterFunc: func(c *generator.Context, t *types.Type) bool {
+				tags := MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				return tags.NeedsReconcileFunc()
 			},
 		})
 	}
