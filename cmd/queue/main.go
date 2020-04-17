@@ -403,14 +403,14 @@ func main() {
 		}(name, server)
 	}
 
-	// Setup /var/log.
-	// Logic that isn't required to be executed before the critical path
-	// and should be started last to not impact start up latency
-	go func() {
-		if env.EnableVarLogCollection {
+	if env.EnableVarLogCollection {
+		// Setup /var/log.
+		// Logic that isn't required to be executed before the critical path
+		// and should be started last to not impact start up latency
+		go func() {
 			createVarLogLink(env)
-		}
-	}()
+		}()
+	}
 
 	// Blocks until we actually receive a TERM signal or one of the servers
 	// exit unexpectedly. We fold both signals together because we only want
