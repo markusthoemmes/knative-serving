@@ -425,7 +425,7 @@ func TestThrottlerSuccesses(t *testing.T) {
 					},
 				},
 				Subsets: []corev1.EndpointSubset{
-					*epSubset(8012, "http", []string{"130.0.0.2"}, nil),
+					epSubset(8012, "http", []string{"130.0.0.2"}, nil),
 				},
 			}
 
@@ -629,7 +629,7 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 			},
 		},
 		Subsets: []corev1.EndpointSubset{
-			*epSubset(8013, "http2", []string{"130.0.0.1", "130.0.0.2"}, nil),
+			epSubset(8013, "http2", []string{"130.0.0.1", "130.0.0.2"}, nil),
 		},
 	}
 	fake.CoreV1().Endpoints(testNamespace).Create(publicEp)
@@ -660,7 +660,7 @@ func TestActivatorsIndexUpdate(t *testing.T) {
 	}
 
 	publicEp.Subsets = []corev1.EndpointSubset{
-		*epSubset(8013, "http2", []string{"130.0.0.2"}, nil),
+		epSubset(8013, "http2", []string{"130.0.0.2"}, nil),
 	}
 
 	fake.CoreV1().Endpoints(testNamespace).Update(publicEp)
@@ -725,8 +725,7 @@ func TestMultipleActivators(t *testing.T) {
 			},
 		},
 		Subsets: []corev1.EndpointSubset{
-			*epSubset(8012, "http", []string{"130.0.0.1", "130.0.0.2"},
-				nil)},
+			epSubset(8012, "http", []string{"130.0.0.1", "130.0.0.2"}, nil)},
 	}
 	fake.CoreV1().Endpoints(testNamespace).Create(publicEp)
 	endpoints.Informer().GetIndexer().Add(publicEp)
