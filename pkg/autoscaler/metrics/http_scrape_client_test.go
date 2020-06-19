@@ -18,10 +18,12 @@ package metrics
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -201,6 +203,47 @@ func TestHTTPScrapeClient_Scrape_ErrorCases(t *testing.T) {
 				t.Error("Expected error from newServiceScraperWithClient, got nil")
 			}
 		})
+	}
+}
+
+func BenchmarkUnmarshalling(b *testing.B) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(testOptionalContext))
+	}))
+	defer server.Close()
+
+	scrapeClient, err := newHTTPScrapeClient(http.DefaultClient)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		if _, err := scrapeClient.Scrape(server.URL); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkUnmarshallingGzip(b *testing.B) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Encoding", "gzip")
+		writer := gzip.NewWriter(w)
+		defer writer.Close()
+		if _, err := writer.Write([]byte(testOptionalContext)); err != nil {
+			b.Error(err)
+		}
+	}))
+	defer server.Close()
+
+	scrapeClient, err := newHTTPScrapeClient(http.DefaultClient)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		if _, err := scrapeClient.Scrape(server.URL); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

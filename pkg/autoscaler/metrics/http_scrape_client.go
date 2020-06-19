@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -45,16 +46,28 @@ func (c *httpScrapeClient) Scrape(url string) (Stat, error) {
 	if err != nil {
 		return emptyStat, err
 	}
+	req.Header.Add("Accept-Encoding", "gzip")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return emptyStat, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return emptyStat, fmt.Errorf("GET request for URL %q returned HTTP status %v", url, resp.StatusCode)
 	}
 
-	return extractData(resp.Body)
+	body := resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(body)
+		if err != nil {
+			return emptyStat, err
+		}
+		defer gzipReader.Close()
+		body = gzipReader
+	}
+
+	return extractData(body)
 }
 
 func extractData(body io.Reader) (Stat, error) {
