@@ -50,7 +50,6 @@ import (
 	"knative.dev/serving/pkg/apis/serving"
 	asmetrics "knative.dev/serving/pkg/autoscaler/metrics"
 	"knative.dev/serving/pkg/autoscaler/scaling"
-	"knative.dev/serving/pkg/autoscaler/statserver"
 	smetrics "knative.dev/serving/pkg/metrics"
 	"knative.dev/serving/pkg/reconciler/autoscaling/kpa"
 	"knative.dev/serving/pkg/reconciler/metric"
@@ -58,7 +57,7 @@ import (
 )
 
 const (
-	statsServerAddr = ":8080"
+	statsServerAddr = ":8081"
 	statsBufferLen  = 1000
 	component       = "autoscaler"
 	controllerNum   = 2
@@ -147,7 +146,7 @@ func main() {
 	}
 
 	// Set up a statserver.
-	statsServer := statserver.New(statsServerAddr, statsCh, logger)
+	ingestorServer := &asmetrics.IngestorServer{StatsCh: statsCh}
 
 	// Start watching the configs.
 	if err := cmw.Start(ctx.Done()); err != nil {
@@ -171,14 +170,19 @@ func main() {
 	profilingServer := profiling.NewServer(profilingHandler)
 
 	eg, egCtx := errgroup.WithContext(ctx)
-	eg.Go(statsServer.ListenAndServe)
+	eg.Go(func() error {
+		logger.Info("starting ingestor")
+		err := ingestorServer.ListenAndServe(statsServerAddr)
+		logger.Errorw("ingestor failed", zap.Error(err))
+		return err
+	})
 	eg.Go(profilingServer.ListenAndServe)
 
 	// This will block until either a signal arrives or one of the grouped functions
 	// returns an error.
 	<-egCtx.Done()
 
-	statsServer.Shutdown(5 * time.Second)
+	ingestorServer.Shutdown()
 	profilingServer.Shutdown(context.Background())
 	// Don't forward ErrServerClosed as that indicates we're already shutting down.
 	if err := eg.Wait(); err != nil && err != http.ErrServerClosed {

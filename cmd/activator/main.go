@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -32,8 +31,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"go.opencensus.io/stats/view"
 	"go.uber.org/zap"
-
-	gorillawebsocket "github.com/gorilla/websocket"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	// Injection related imports.
 	kubeclient "knative.dev/pkg/client/injection/kube/client"
@@ -56,7 +55,6 @@ import (
 	"knative.dev/pkg/tracing"
 	tracingconfig "knative.dev/pkg/tracing/config"
 	"knative.dev/pkg/version"
-	"knative.dev/pkg/websocket"
 	activatorconfig "knative.dev/serving/pkg/activator/config"
 	activatorhandler "knative.dev/serving/pkg/activator/handler"
 	activatornet "knative.dev/serving/pkg/activator/net"
@@ -72,8 +70,8 @@ const (
 	// Add enough buffer to not block request serving on stats collection
 	requestCountingQueueLength = 100
 
-	// The port on which autoscaler WebSocket server listens.
-	autoscalerPort = ":8080"
+	// The port on which the autoscaler ingestor server listens.
+	autoscalerPort = ":8081"
 )
 
 var (
@@ -82,17 +80,19 @@ var (
 	kubeconfig = flag.String("kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 )
 
-func statReporter(statSink *websocket.ManagedConnection, statChan <-chan []asmetrics.StatMessage,
-	logger *zap.SugaredLogger) {
+func statReporter(client asmetrics.MetricIngestorClient, statChan <-chan []asmetrics.StatMessage, logger *zap.SugaredLogger) {
+	ingestor, err := client.Ingest(context.Background())
+	if err != nil {
+		logger.Fatalw("Failed to create ingestion call", zap.Error(err))
+	}
 	for sm := range statChan {
 		go func(msgs []asmetrics.StatMessage) {
 			for _, msg := range msgs {
-				b, err := json.Marshal(msg)
-				if err != nil {
-					logger.Errorw("Error while marshaling stat", zap.Error(err))
-					continue
-				}
-				if err := statSink.SendRaw(gorillawebsocket.TextMessage, b); err != nil {
+				if err := ingestor.Send(&asmetrics.WireStatMessage{
+					Namespace: msg.Key.Namespace,
+					Name:      msg.Key.Name,
+					Stat:      &msg.Stat,
+				}); err != nil {
 					logger.Errorw("Error while sending stat", zap.Error(err))
 				}
 			}
@@ -191,12 +191,16 @@ func main() {
 	configStore := activatorconfig.NewStore(logger, tracerUpdater)
 	configStore.WatchConfigs(configMapWatcher)
 
-	// Open a WebSocket connection to the autoscaler.
-	autoscalerEndpoint := fmt.Sprintf("ws://%s.%s.svc.%s%s", "autoscaler", system.Namespace(), pkgnet.GetClusterDomainName(), autoscalerPort)
+	// Open a gRPC connection to the autoscaler.
+	autoscalerEndpoint := fmt.Sprintf("%s.%s.svc.%s%s", "autoscaler", system.Namespace(), pkgnet.GetClusterDomainName(), autoscalerPort)
 	logger.Info("Connecting to Autoscaler at ", autoscalerEndpoint)
-	statSink := websocket.NewDurableSendingConnection(autoscalerEndpoint, logger)
-	defer statSink.Shutdown()
-	go statReporter(statSink, statCh, logger)
+	autoscalerConn, err := grpc.Dial(autoscalerEndpoint, grpc.WithInsecure())
+	if err != nil {
+		logger.Fatalw("Failed to dial "+autoscalerEndpoint, zap.Error(err))
+	}
+	defer autoscalerConn.Close()
+	ingestionClient := asmetrics.NewMetricIngestorClient(autoscalerConn)
+	go statReporter(ingestionClient, statCh, logger)
 
 	// Create and run our concurrency reporter
 	cr := activatorhandler.NewConcurrencyReporter(ctx, env.PodName, reqCh, statCh)
@@ -226,7 +230,7 @@ func main() {
 
 	// Set up our health check based on the health of stat sink and environmental factors.
 	sigCtx, sigCancel := context.WithCancel(context.Background())
-	hc := newHealthCheck(sigCtx, logger, statSink)
+	hc := newHealthCheck(sigCtx, logger, autoscalerConn)
 	ah = &activatorhandler.HealthHandler{HealthCheck: hc, NextHandler: ah, Logger: logger}
 
 	profilingHandler := profiling.NewHandler(logger, false)
@@ -284,7 +288,7 @@ func main() {
 	logger.Info("Servers shutdown.")
 }
 
-func newHealthCheck(sigCtx context.Context, logger *zap.SugaredLogger, statSink *websocket.ManagedConnection) func() error {
+func newHealthCheck(sigCtx context.Context, logger *zap.SugaredLogger, asConn *grpc.ClientConn) func() error {
 	once := sync.Once{}
 	return func() error {
 		select {
@@ -296,7 +300,10 @@ func newHealthCheck(sigCtx context.Context, logger *zap.SugaredLogger, statSink 
 			return errors.New("received SIGTERM from kubelet")
 		default:
 			logger.Debug("No signal yet.")
-			return statSink.Status()
+			if asConn.GetState() == connectivity.Ready {
+				return nil
+			}
+			return errors.New("no connection to autoscaler (yet)")
 		}
 	}
 }
