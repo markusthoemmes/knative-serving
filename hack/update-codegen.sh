@@ -57,6 +57,8 @@ if (( generate_protobufs )); then
   done
 fi
 
+exit
+
 echo "Generating checksums for configmap _example keys"
 go run "${REPO_ROOT_DIR}/vendor/knative.dev/pkg/configmap/hash-gen" "${REPO_ROOT_DIR}"/config/core/configmaps/*.yaml
 
