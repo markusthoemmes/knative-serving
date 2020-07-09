@@ -42,6 +42,50 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type WireStatMessages struct {
+	Messages []*WireStatMessage `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+}
+
+func (m *WireStatMessages) Reset()         { *m = WireStatMessages{} }
+func (m *WireStatMessages) String() string { return proto.CompactTextString(m) }
+func (*WireStatMessages) ProtoMessage()    {}
+func (*WireStatMessages) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7c0bc3cc69d61452, []int{0}
+}
+func (m *WireStatMessages) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *WireStatMessages) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_WireStatMessages.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *WireStatMessages) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WireStatMessages.Merge(m, src)
+}
+func (m *WireStatMessages) XXX_Size() int {
+	return m.Size()
+}
+func (m *WireStatMessages) XXX_DiscardUnknown() {
+	xxx_messageInfo_WireStatMessages.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WireStatMessages proto.InternalMessageInfo
+
+func (m *WireStatMessages) GetMessages() []*WireStatMessage {
+	if m != nil {
+		return m.Messages
+	}
+	return nil
+}
+
 // WireStatMessage is a copy of the StatMessage Golang type, exploding the fields of
 // `types.NamespacedName` to make it compatible with protobufs.
 type WireStatMessage struct {
@@ -54,7 +98,7 @@ func (m *WireStatMessage) Reset()         { *m = WireStatMessage{} }
 func (m *WireStatMessage) String() string { return proto.CompactTextString(m) }
 func (*WireStatMessage) ProtoMessage()    {}
 func (*WireStatMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7c0bc3cc69d61452, []int{0}
+	return fileDescriptor_7c0bc3cc69d61452, []int{1}
 }
 func (m *WireStatMessage) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -112,7 +156,7 @@ func (m *Response) Reset()         { *m = Response{} }
 func (m *Response) String() string { return proto.CompactTextString(m) }
 func (*Response) ProtoMessage()    {}
 func (*Response) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7c0bc3cc69d61452, []int{1}
+	return fileDescriptor_7c0bc3cc69d61452, []int{2}
 }
 func (m *Response) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -142,6 +186,7 @@ func (m *Response) XXX_DiscardUnknown() {
 var xxx_messageInfo_Response proto.InternalMessageInfo
 
 func init() {
+	proto.RegisterType((*WireStatMessages)(nil), "metrics.WireStatMessages")
 	proto.RegisterType((*WireStatMessage)(nil), "metrics.WireStatMessage")
 	proto.RegisterType((*Response)(nil), "metrics.Response")
 }
@@ -151,22 +196,26 @@ func init() {
 }
 
 var fileDescriptor_7c0bc3cc69d61452 = []byte{
-	// 230 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x52, 0x2d, 0xc8, 0x4e, 0xd7,
-	0x4f, 0x2c, 0x2d, 0xc9, 0x2f, 0x4e, 0x4e, 0xcc, 0x49, 0x2d, 0xd2, 0xcf, 0x4d, 0x2d, 0x29, 0xca,
-	0x4c, 0x2e, 0xd6, 0xcf, 0xcc, 0x4b, 0x4f, 0x2d, 0x2e, 0xc9, 0x2f, 0xd2, 0x2b, 0x28, 0xca, 0x2f,
-	0xc9, 0x17, 0x62, 0x87, 0x8a, 0x4b, 0x29, 0xe2, 0x50, 0x5f, 0x5c, 0x92, 0x58, 0x02, 0x51, 0xab,
-	0x94, 0xc6, 0xc5, 0x1f, 0x9e, 0x59, 0x94, 0x1a, 0x5c, 0x92, 0x58, 0xe2, 0x9b, 0x5a, 0x5c, 0x9c,
-	0x98, 0x9e, 0x2a, 0x24, 0xc3, 0xc5, 0x99, 0x97, 0x98, 0x9b, 0x5a, 0x5c, 0x90, 0x98, 0x9c, 0x2a,
-	0xc1, 0xa8, 0xc0, 0xa8, 0xc1, 0x19, 0x84, 0x10, 0x10, 0x12, 0xe2, 0x62, 0x01, 0x71, 0x24, 0x98,
-	0xc0, 0x12, 0x60, 0xb6, 0x90, 0x22, 0x17, 0x0b, 0xc8, 0x48, 0x09, 0x66, 0x05, 0x46, 0x0d, 0x6e,
-	0x23, 0x5e, 0x3d, 0xa8, 0x3d, 0x7a, 0x20, 0x53, 0x83, 0xc0, 0x52, 0x4a, 0x5c, 0x5c, 0x1c, 0x41,
-	0xa9, 0xc5, 0x05, 0xf9, 0x79, 0xc5, 0xa9, 0x46, 0xde, 0x5c, 0x7c, 0xbe, 0x60, 0x15, 0x9e, 0x50,
-	0x77, 0x0b, 0x59, 0x72, 0xb1, 0x41, 0xd8, 0x42, 0x12, 0x70, 0xcd, 0x68, 0xce, 0x92, 0x12, 0x84,
-	0xcb, 0xc0, 0x0c, 0x52, 0x62, 0xd0, 0x60, 0x74, 0x92, 0x38, 0xf1, 0x48, 0x8e, 0xf1, 0xc2, 0x23,
-	0x39, 0xc6, 0x07, 0x8f, 0xe4, 0x18, 0x27, 0x3c, 0x96, 0x63, 0xb8, 0xf0, 0x58, 0x8e, 0xe1, 0xc6,
-	0x63, 0x39, 0x86, 0x24, 0x36, 0xb0, 0x0f, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xe6, 0xf1,
-	0xe4, 0xf7, 0x36, 0x01, 0x00, 0x00,
+	// 290 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x91, 0xbd, 0x4e, 0xfb, 0x30,
+	0x14, 0xc5, 0xe3, 0x7f, 0xab, 0xfe, 0xdb, 0x5b, 0x01, 0xc5, 0x93, 0xa9, 0x90, 0xd5, 0x46, 0x42,
+	0xca, 0x94, 0x48, 0x81, 0x05, 0x89, 0x09, 0x31, 0xc0, 0x90, 0x25, 0x1d, 0x98, 0x4d, 0x74, 0x89,
+	0x22, 0xc8, 0x87, 0x7c, 0xcd, 0xc0, 0x5b, 0xf0, 0x58, 0x6c, 0x74, 0x64, 0x44, 0xc9, 0x8b, 0xa0,
+	0x7c, 0x90, 0x4a, 0x15, 0x19, 0xd8, 0x8e, 0xef, 0x39, 0xbf, 0xe3, 0x2b, 0x1b, 0xce, 0x8a, 0xa7,
+	0xd8, 0x53, 0x2f, 0x26, 0xa7, 0x48, 0x3d, 0xa3, 0xf6, 0x52, 0x34, 0x3a, 0x89, 0xc8, 0x4b, 0xb2,
+	0x18, 0xc9, 0xe4, 0xda, 0x2d, 0x74, 0x6e, 0x72, 0xfe, 0xbf, 0x9b, 0x2f, 0xd7, 0x03, 0x79, 0x32,
+	0xca, 0xb4, 0x59, 0xfb, 0x16, 0x16, 0xf7, 0x89, 0xc6, 0x8d, 0x51, 0x26, 0x40, 0x22, 0x15, 0x23,
+	0xf1, 0x0b, 0x98, 0xa6, 0x9d, 0x16, 0x6c, 0x35, 0x72, 0xe6, 0xbe, 0x70, 0x3b, 0xd4, 0xdd, 0x0b,
+	0x87, 0x7d, 0xd2, 0x7e, 0x84, 0xa3, 0x3d, 0x93, 0x9f, 0xc2, 0x2c, 0x53, 0x29, 0x52, 0xa1, 0x22,
+	0x14, 0x6c, 0xc5, 0x9c, 0x59, 0xb8, 0x1b, 0x70, 0x0e, 0xe3, 0xfa, 0x20, 0xfe, 0x35, 0x46, 0xa3,
+	0xf9, 0x1a, 0xc6, 0xf5, 0x72, 0x62, 0xb4, 0x62, 0xce, 0xdc, 0x3f, 0xe8, 0xaf, 0xad, 0x5b, 0xc3,
+	0xc6, 0xb2, 0x01, 0xa6, 0x21, 0x52, 0x91, 0x67, 0x84, 0xfe, 0x07, 0x83, 0xc3, 0xa0, 0x89, 0xdc,
+	0x75, 0x4f, 0xc0, 0x2f, 0x61, 0xd2, 0x6a, 0x3e, 0xb8, 0xf4, 0xf2, 0xb8, 0x77, 0x7e, 0x9a, 0x6c,
+	0xcb, 0x61, 0xfc, 0x0a, 0xa0, 0x45, 0x03, 0x95, 0xbd, 0xf2, 0x93, 0x21, 0x9c, 0x7e, 0xe5, 0xf9,
+	0x0d, 0x2c, 0x76, 0xf4, 0xc6, 0x68, 0x54, 0xe9, 0x5f, 0x3b, 0x1c, 0x76, 0x2d, 0xde, 0x4b, 0xc9,
+	0xb6, 0xa5, 0x64, 0x5f, 0xa5, 0x64, 0x6f, 0x95, 0xb4, 0xb6, 0x95, 0xb4, 0x3e, 0x2b, 0x69, 0x3d,
+	0x4c, 0x9a, 0x0f, 0x3b, 0xff, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xe5, 0xe3, 0xf2, 0x4f, 0x05, 0x02,
+	0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -182,6 +231,8 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type MetricIngestorClient interface {
 	Ingest(ctx context.Context, opts ...grpc.CallOption) (MetricIngestor_IngestClient, error)
+	IngestMany(ctx context.Context, in *WireStatMessages, opts ...grpc.CallOption) (*Response, error)
+	IngestManyStream(ctx context.Context, opts ...grpc.CallOption) (MetricIngestor_IngestManyStreamClient, error)
 }
 
 type metricIngestorClient struct {
@@ -226,9 +277,54 @@ func (x *metricIngestorIngestClient) CloseAndRecv() (*Response, error) {
 	return m, nil
 }
 
+func (c *metricIngestorClient) IngestMany(ctx context.Context, in *WireStatMessages, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/metrics.MetricIngestor/IngestMany", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *metricIngestorClient) IngestManyStream(ctx context.Context, opts ...grpc.CallOption) (MetricIngestor_IngestManyStreamClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_MetricIngestor_serviceDesc.Streams[1], "/metrics.MetricIngestor/IngestManyStream", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &metricIngestorIngestManyStreamClient{stream}
+	return x, nil
+}
+
+type MetricIngestor_IngestManyStreamClient interface {
+	Send(*WireStatMessages) error
+	CloseAndRecv() (*Response, error)
+	grpc.ClientStream
+}
+
+type metricIngestorIngestManyStreamClient struct {
+	grpc.ClientStream
+}
+
+func (x *metricIngestorIngestManyStreamClient) Send(m *WireStatMessages) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *metricIngestorIngestManyStreamClient) CloseAndRecv() (*Response, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(Response)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // MetricIngestorServer is the server API for MetricIngestor service.
 type MetricIngestorServer interface {
 	Ingest(MetricIngestor_IngestServer) error
+	IngestMany(context.Context, *WireStatMessages) (*Response, error)
+	IngestManyStream(MetricIngestor_IngestManyStreamServer) error
 }
 
 // UnimplementedMetricIngestorServer can be embedded to have forward compatible implementations.
@@ -237,6 +333,12 @@ type UnimplementedMetricIngestorServer struct {
 
 func (*UnimplementedMetricIngestorServer) Ingest(srv MetricIngestor_IngestServer) error {
 	return status.Errorf(codes.Unimplemented, "method Ingest not implemented")
+}
+func (*UnimplementedMetricIngestorServer) IngestMany(ctx context.Context, req *WireStatMessages) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IngestMany not implemented")
+}
+func (*UnimplementedMetricIngestorServer) IngestManyStream(srv MetricIngestor_IngestManyStreamServer) error {
+	return status.Errorf(codes.Unimplemented, "method IngestManyStream not implemented")
 }
 
 func RegisterMetricIngestorServer(s *grpc.Server, srv MetricIngestorServer) {
@@ -269,18 +371,109 @@ func (x *metricIngestorIngestServer) Recv() (*WireStatMessage, error) {
 	return m, nil
 }
 
+func _MetricIngestor_IngestMany_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WireStatMessages)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetricIngestorServer).IngestMany(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metrics.MetricIngestor/IngestMany",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetricIngestorServer).IngestMany(ctx, req.(*WireStatMessages))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MetricIngestor_IngestManyStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MetricIngestorServer).IngestManyStream(&metricIngestorIngestManyStreamServer{stream})
+}
+
+type MetricIngestor_IngestManyStreamServer interface {
+	SendAndClose(*Response) error
+	Recv() (*WireStatMessages, error)
+	grpc.ServerStream
+}
+
+type metricIngestorIngestManyStreamServer struct {
+	grpc.ServerStream
+}
+
+func (x *metricIngestorIngestManyStreamServer) SendAndClose(m *Response) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *metricIngestorIngestManyStreamServer) Recv() (*WireStatMessages, error) {
+	m := new(WireStatMessages)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 var _MetricIngestor_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "metrics.MetricIngestor",
 	HandlerType: (*MetricIngestorServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "IngestMany",
+			Handler:    _MetricIngestor_IngestMany_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Ingest",
 			Handler:       _MetricIngestor_Ingest_Handler,
 			ClientStreams: true,
 		},
+		{
+			StreamName:    "IngestManyStream",
+			Handler:       _MetricIngestor_IngestManyStream_Handler,
+			ClientStreams: true,
+		},
 	},
 	Metadata: "pkg/autoscaler/metrics/ingestor.proto",
+}
+
+func (m *WireStatMessages) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *WireStatMessages) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *WireStatMessages) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Messages) > 0 {
+		for iNdEx := len(m.Messages) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Messages[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintIngestor(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *WireStatMessage) Marshal() (dAtA []byte, err error) {
@@ -366,6 +559,21 @@ func encodeVarintIngestor(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *WireStatMessages) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Messages) > 0 {
+		for _, e := range m.Messages {
+			l = e.Size()
+			n += 1 + l + sovIngestor(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *WireStatMessage) Size() (n int) {
 	if m == nil {
 		return 0
@@ -401,6 +609,93 @@ func sovIngestor(x uint64) (n int) {
 }
 func sozIngestor(x uint64) (n int) {
 	return sovIngestor(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *WireStatMessages) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowIngestor
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: WireStatMessages: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: WireStatMessages: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Messages", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIngestor
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthIngestor
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthIngestor
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Messages = append(m.Messages, &WireStatMessage{})
+			if err := m.Messages[len(m.Messages)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipIngestor(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthIngestor
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthIngestor
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *WireStatMessage) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)

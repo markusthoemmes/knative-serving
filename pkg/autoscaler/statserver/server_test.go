@@ -173,7 +173,7 @@ func TestServerDoesNotLeakGoroutines(t *testing.T) {
 }
 
 func BenchmarkStatServer(b *testing.B) {
-	statsCh := make(chan metrics.StatMessage, 1)
+	statsCh := make(chan metrics.StatMessage, 1000)
 	server := newTestServer(statsCh)
 	go server.listenAndServe()
 	defer server.Shutdown(time.Second)
@@ -183,15 +183,23 @@ func BenchmarkStatServer(b *testing.B) {
 		b.Fatal("Dial failed:", err)
 	}
 
-	msg := newStatMessage(types.NamespacedName{Namespace: "test-namespace", Name: "test-revision"}, "activator1", 2.1, 51)
+	msgs := make([]metrics.StatMessage, 0, 10)
+	for i := 0; i < cap(msgs); i++ {
+		msgs = append(msgs, newStatMessage(types.NamespacedName{Namespace: "test-namespace", Name: "test-revision"}, "activator1", 2.1, 51))
+	}
 
 	for encoding, jsonEncoding := range map[string]bool{"json": true, "gob": false} {
 		b.Run(fmt.Sprintf("%s-encoding-sequential", encoding), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if err := send(statSink, msg, jsonEncoding); err != nil {
-					b.Fatal("Expected send to succeed, but got:", err)
+				for _, msg := range msgs {
+					if err := send(statSink, msg, jsonEncoding); err != nil {
+						b.Fatal("Expected send to succeed, but got:", err)
+					}
 				}
-				<-statsCh
+
+				for j := 0; j < len(msgs); j++ {
+					<-statsCh
+				}
 			}
 		})
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	context "context"
 	"io"
 	"net"
 
@@ -56,6 +57,54 @@ func (s *IngestorServer) Ingest(srv MetricIngestor_IngestServer) error {
 	}
 }
 
+// Ingest reads the stream of incoming WireStatMessage objects, translates them into
+// StatMessage objects and surfaces those on the given channel.
+func (s *IngestorServer) IngestMany(ctx context.Context, msgs *WireStatMessages) (*Response, error) {
+	if msgs == nil {
+		return nil, nil
+	}
+
+	for _, msg := range msgs.Messages {
+		if msg == nil || msg.Stat == nil {
+			continue
+		}
+
+		s.StatsCh <- StatMessage{
+			Key: types.NamespacedName{
+				Namespace: msg.Namespace,
+				Name:      msg.Name,
+			},
+			Stat: *msg.Stat,
+		}
+	}
+	return nil, nil
+}
+
+func (s *IngestorServer) IngestManyStream(srv MetricIngestor_IngestManyStreamServer) error {
+	for {
+		req, err := srv.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		if req == nil {
+			return nil
+		}
+
+		for _, msg := range req.Messages {
+			s.StatsCh <- StatMessage{
+				Key: types.NamespacedName{
+					Namespace: msg.Namespace,
+					Name:      msg.Name,
+				},
+				Stat: *msg.Stat,
+			}
+		}
+	}
+}
+
 // ListenAndServe listens on the address s.addr and handles incoming connections.
 // It blocks until the server fails or Shutdown is called.
 // It returns an error or, if Shutdown was called, nil.
@@ -71,5 +120,8 @@ func (s *IngestorServer) ListenAndServe(addr string) error {
 
 // Shutdown gracefully shuts the server down.
 func (s *IngestorServer) Shutdown() {
+	if s.server == nil {
+		return
+	}
 	s.server.GracefulStop()
 }

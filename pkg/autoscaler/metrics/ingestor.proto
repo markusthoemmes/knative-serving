@@ -22,6 +22,12 @@ import "pkg/autoscaler/metrics/stat.proto";
 
 service MetricIngestor {
   rpc Ingest(stream WireStatMessage) returns (Response) {}
+  rpc IngestMany(WireStatMessages) returns (Response) {}
+  rpc IngestManyStream(stream WireStatMessages) returns (Response) {}
+}
+
+message WireStatMessages {
+  repeated WireStatMessage messages = 1;
 }
 
 // WireStatMessage is a copy of the StatMessage Golang type, exploding the fields of
