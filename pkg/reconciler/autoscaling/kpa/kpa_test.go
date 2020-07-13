@@ -162,6 +162,16 @@ func metric(ns, n string, opts ...metricOption) *asv1a1.Metric {
 	return m
 }
 
+func metricWithASConfig(ns, n string, asConfig *autoscalerconfig.Config, opts ...metricOption) *asv1a1.Metric {
+	pa := kpa(ns, n)
+	m := aresources.MakeMetric(context.Background(), pa,
+		kmeta.ChildName(n, "-private"), asConfig)
+	for _, o := range opts {
+		o(m)
+	}
+	return m
+}
+
 func sks(ns, n string, so ...SKSOption) *nv1a1.ServerlessService {
 	kpa := kpa(ns, n)
 	s := aresources.MakeSKS(kpa, nv1a1.SKSOperationModeServe, scaling.MinActivators)
@@ -276,7 +286,7 @@ func TestReconcile(t *testing.T) {
 	deciderKey := struct{}{}
 	retryAttempted := false
 
-	asConfigKey := struct{}{}
+	asConfigKey := ""
 
 	// Note: due to how KPA reconciler works we are dependent on the
 	// two constant objects above, which means, that all tests must share
@@ -1027,7 +1037,7 @@ func TestReconcile(t *testing.T) {
 			decider(testNamespace, testRevision, -1, /* desiredScale */
 				-42 /* ebc */, scaling.MinActivators)),
 		Objects: []runtime.Object{
-			kpa(testNamespace, testRevision, markActivating, withScales(0, scaleUnknown), WithReachabilityReachable,
+			kpa(testNamespace, testRevision, markActivating, withScales(0, 0), WithReachabilityReachable,
 				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc),
 			),
 			sks(testNamespace, testRevision, WithDeployRef(deployName), WithSKSReady,
@@ -1040,7 +1050,8 @@ func TestReconcile(t *testing.T) {
 			}),
 		},
 		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: kpa(testNamespace, testRevision, markActivating, withScales(0, -1), WithReachabilityReachable,
+			Object: kpa(testNamespace, testRevision, markActive, markScaleTargetInitialized,
+				withScales(0, -1), WithReachabilityReachable,
 				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc), WithObservedGeneration(1),
 			),
 		}},
@@ -1055,7 +1066,7 @@ func TestReconcile(t *testing.T) {
 				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc),
 			),
 			sks(testNamespace, testRevision, WithDeployRef(deployName), WithProxyMode, WithSKSReady, WithPrivateService),
-			metric(testNamespace, testRevision),
+			metricWithASConfig(testNamespace, testRevision, &autoscalerconfig.Config{InitialScale: 0, AllowZeroInitialScale: true, EnableScaleToZero: true}),
 			makeSKSPrivateEndpoints(2, testNamespace, testRevision),
 			deploy(testNamespace, testRevision, func(d *appsv1.Deployment) {
 				d.Spec.Replicas = ptr.Int32(2)
@@ -1088,6 +1099,10 @@ func TestReconcile(t *testing.T) {
 			fakeDeciders.Create(ctx, d.(*scaling.Decider))
 		}
 
+		testConfigs := defaultConfig()
+		if asConfig := ctx.Value(asConfigKey); asConfig != nil {
+			testConfigs.Autoscaler = asConfig.(*autoscalerconfig.Config)
+		}
 		psf := podscalable.Get(ctx)
 		scaler := newScaler(ctx, psf, func(interface{}, time.Duration) {})
 		scaler.activatorProbe = func(*asv1a1.PodAutoscaler, http.RoundTripper) (bool, error) { return true, nil }
@@ -1106,7 +1121,7 @@ func TestReconcile(t *testing.T) {
 			servingclient.Get(ctx), listers.GetPodAutoscalerLister(),
 			controller.GetEventRecorder(ctx), r, autoscaling.KPA,
 			controller.Options{
-				ConfigStore: &testConfigStore{config: defaultConfig()},
+				ConfigStore: &testConfigStore{config: testConfigs},
 			})
 	}))
 }
