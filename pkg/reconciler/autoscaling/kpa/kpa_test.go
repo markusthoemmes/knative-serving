@@ -172,8 +172,7 @@ func metric(ns, n string, opts ...metricOption) *asv1a1.Metric {
 
 func metricWithASConfig(ns, n string, asConfig *autoscalerconfig.Config, opts ...metricOption) *asv1a1.Metric {
 	pa := kpa(ns, n)
-	m := aresources.MakeMetric(context.Background(), pa,
-		kmeta.ChildName(n, "-private"), asConfig)
+	m := aresources.MakeMetric(pa, kmeta.ChildName(n, "-private"), asConfig)
 	for _, o := range opts {
 		o(m)
 	}
