@@ -1037,27 +1037,20 @@ func TestReconcile(t *testing.T) {
 			Patch:      []byte(fmt.Sprintf(`[{"op":"replace","path":"/spec/replicas","value":%d}]`, 20)),
 		}},
 	}, {
-		Name: "initial scale zero: scale to zero",
+		Name: "initial scale zero: stay at zero",
 		Key:  key,
 		Ctx: context.WithValue(context.WithValue(context.Background(), asConfigKey, initialScaleZeroConfigMap()), deciderKey,
 			decider(testNamespace, testRevision, -1, /* desiredScale */
 				0 /* ebc */, scaling.MinActivators)),
 		Objects: append([]runtime.Object{
-			kpa(testNamespace, testRevision, markActivating, withScales(0, 0), WithReachabilityReachable,
-				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc),
-			),
-			sks(testNamespace, testRevision, WithDeployRef(deployName), WithProxyMode, WithSKSReady, WithPrivateService),
+			kpa(testNamespace, testRevision, markInactive, markScaleTargetInitialized, withScales(0, scaleUnknown), WithReachabilityReachable,
+				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc), WithObservedGeneration(1)),
+			sks(testNamespace, testRevision, WithDeployRef(deployName), WithProxyMode, WithSKSReady),
 			metric(testNamespace, testRevision),
 			deploy(testNamespace, testRevision, func(d *appsv1.Deployment) {
 				d.Spec.Replicas = ptr.Int32(0)
 			}),
 		}, makeReadyPods(0, testNamespace, testRevision)...),
-		WantStatusUpdates: []clientgotesting.UpdateActionImpl{{
-			Object: kpa(testNamespace, testRevision, markInactive, markScaleTargetInitialized,
-				withScales(0, 0), WithReachabilityReachable,
-				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc), WithObservedGeneration(1),
-			),
-		}},
 	}, {
 		Name: "initial scale zero: scale to greater than zero",
 		Key:  key,
@@ -1065,7 +1058,7 @@ func TestReconcile(t *testing.T) {
 			decider(testNamespace, testRevision, 2, /* desiredScale */
 				-42 /* ebc */, scaling.MinActivators)),
 		Objects: append([]runtime.Object{
-			kpa(testNamespace, testRevision, markActive, withScales(2, 2), WithReachabilityReachable,
+			kpa(testNamespace, testRevision, markActive, withScales(2, 2), WithReachabilityReachable, markScaleTargetInitialized,
 				WithPAStatusService(testRevision), WithPAMetricsService(privateSvc),
 			),
 			sks(testNamespace, testRevision, WithDeployRef(deployName), WithProxyMode, WithSKSReady, WithPrivateService),
