@@ -74,7 +74,6 @@ func TestServiceValidation(t *testing.T) {
 				Name: "valid",
 			},
 			Spec: ServiceSpec{
-				DeprecatedGeneration: 12,
 				DeprecatedRunLatest: &RunLatestType{
 					Configuration: ConfigurationSpec{
 						DeprecatedRevisionTemplate: &RevisionTemplateSpec{
@@ -92,8 +91,7 @@ func TestServiceValidation(t *testing.T) {
 				},
 			},
 		},
-		want: apis.ErrDisallowedFields("spec.generation", "spec.runLatest",
-			"spec.runLatest.configuration.revisionTemplate"),
+		want: apis.ErrDisallowedFields("spec.runLatest", "spec.runLatest.configuration.revisionTemplate"),
 	}, {
 		name: "valid pinned",
 		s: &Service{

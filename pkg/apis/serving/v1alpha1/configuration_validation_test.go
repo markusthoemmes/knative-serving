@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"knative.dev/pkg/ptr"
 
 	"github.com/google/go-cmp/cmp"
@@ -83,7 +85,7 @@ func TestConfigurationSpecValidation(t *testing.T) {
 	}, {
 		name: "no revision template",
 		c: &ConfigurationSpec{
-			DeprecatedGeneration: int64(1),
+			DeprecatedBuild: &runtime.RawExtension{}, // Only a placeholder to trigger test logic.
 		},
 		want: apis.ErrMissingOneOf("revisionTemplate", "template"),
 	}, {

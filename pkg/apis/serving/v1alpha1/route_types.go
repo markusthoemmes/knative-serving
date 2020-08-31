@@ -80,17 +80,6 @@ type TrafficTarget struct {
 
 // RouteSpec holds the desired state of the Route (from the client).
 type RouteSpec struct {
-	// DeprecatedGeneration was used prior in Kubernetes versions <1.11
-	// when metadata.generation was not being incremented by the api server
-	//
-	// This property will be dropped in future Knative releases and should
-	// not be used - use metadata.generation
-	//
-	// Tracking issue: https://github.com/knative/serving/issues/643
-	//
-	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
-
 	// Traffic specifies how to distribute traffic over a collection of Knative Serving Revisions and Configurations.
 	// +optional
 	Traffic []TrafficTarget `json:"traffic,omitempty"`

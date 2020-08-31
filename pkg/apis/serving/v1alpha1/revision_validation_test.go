@@ -98,13 +98,12 @@ func TestRevisionSpecValidation(t *testing.T) {
 		name: "invalid deprecated fields",
 		wc:   apis.DisallowDeprecated,
 		rs: &RevisionSpec{
-			DeprecatedGeneration:   123,
 			DeprecatedServingState: "Active",
 			DeprecatedContainer: &corev1.Container{
 				Image: "helloworld",
 			},
 		},
-		want: apis.ErrDisallowedFields("container", "generation", "servingState"),
+		want: apis.ErrDisallowedFields("container", "servingState"),
 	}, {
 		name: "missing container",
 		rs: &RevisionSpec{

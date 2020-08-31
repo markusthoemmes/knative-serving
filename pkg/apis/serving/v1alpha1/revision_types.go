@@ -101,17 +101,6 @@ const (
 type RevisionSpec struct {
 	v1.RevisionSpec `json:",inline"`
 
-	// DeprecatedGeneration was used prior in Kubernetes versions <1.11
-	// when metadata.generation was not being incremented by the api server
-	//
-	// This property will be dropped in future Knative releases and should
-	// not be used - use metadata.generation
-	//
-	// Tracking issue: https://github.com/knative/serving/issues/643
-	//
-	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
-
 	// DeprecatedServingState holds a value describing the desired state the Kubernetes
 	// resources should be in for this Revision.
 	// Users must not specify this when creating a revision. These values are no longer
