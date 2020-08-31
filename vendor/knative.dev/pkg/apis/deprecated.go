@@ -98,8 +98,12 @@ func getPrefixedNamedFieldValues(prefix string, obj interface{}) (map[string]ref
 			if strings.HasPrefix(tf.Name, prefix) {
 				name := strings.Split(jTag, ",")[0]
 				if name == "" {
-					// Default to field name in go struct if no json name.
-					name = tf.Name
+					if tf.Name == "DeprecatedGeneration" {
+						name = "generation"
+					} else {
+						// Default to field name in go struct if no json name.
+						name = tf.Name
+					}
 				}
 				fields[name] = v
 			} else if jTag == ",inline" {

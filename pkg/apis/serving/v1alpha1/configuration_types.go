@@ -74,7 +74,7 @@ type ConfigurationSpec struct {
 	// Tracking issue: https://github.com/knative/serving/issues/643
 	//
 	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
+	DeprecatedGeneration int64
 
 	// Build optionally holds the specification for the build to
 	// perform to produce the Revision's container image.

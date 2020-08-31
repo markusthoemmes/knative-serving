@@ -87,7 +87,7 @@ type PodAutoscalerSpec struct {
 	// Tracking issue: https://github.com/knative/serving/issues/643
 	//
 	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
+	DeprecatedGeneration int64
 
 	// ContainerConcurrency specifies the maximum allowed
 	// in-flight (concurrent) requests per container of the Revision.

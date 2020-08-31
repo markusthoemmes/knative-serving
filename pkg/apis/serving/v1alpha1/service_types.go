@@ -79,7 +79,7 @@ type ServiceSpec struct {
 	// Tracking issue: https://github.com/knative/serving/issues/643
 	//
 	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
+	DeprecatedGeneration int64
 
 	// DeprecatedRunLatest defines a simple Service. It will automatically
 	// configure a route that keeps the latest ready revision

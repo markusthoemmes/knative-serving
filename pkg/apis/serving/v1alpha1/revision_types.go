@@ -110,7 +110,7 @@ type RevisionSpec struct {
 	// Tracking issue: https://github.com/knative/serving/issues/643
 	//
 	// +optional
-	DeprecatedGeneration int64 `json:"generation,omitempty"`
+	DeprecatedGeneration int64
 
 	// DeprecatedServingState holds a value describing the desired state the Kubernetes
 	// resources should be in for this Revision.
