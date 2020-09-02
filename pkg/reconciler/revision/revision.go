@@ -27,6 +27,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
@@ -37,10 +39,13 @@ import (
 	cachinglisters "knative.dev/caching/pkg/client/listers/caching/v1alpha1"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
+	"knative.dev/pkg/ptr"
 	pkgreconciler "knative.dev/pkg/reconciler"
+	"knative.dev/serving/pkg/apis/serving"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	palisters "knative.dev/serving/pkg/client/listers/autoscaling/v1alpha1"
 	"knative.dev/serving/pkg/reconciler/revision/config"
+	resourcenames "knative.dev/serving/pkg/reconciler/revision/resources/names"
 )
 
 const digestResolutionTimeout = 60 * time.Second
@@ -65,6 +70,7 @@ type Reconciler struct {
 
 // Check that our Reconciler implements revisionreconciler.Interface
 var _ revisionreconciler.Interface = (*Reconciler)(nil)
+var _ revisionreconciler.Finalizer = (*Reconciler)(nil)
 
 func (c *Reconciler) reconcileDigest(ctx context.Context, rev *v1.Revision) error {
 	if rev.Status.ContainerStatuses == nil {
@@ -164,4 +170,22 @@ func (c *Reconciler) updateRevisionLoggingURL(ctx context.Context, rev *v1.Revis
 	rev.Status.LogURL = strings.ReplaceAll(
 		config.Observability.LoggingURLTemplate,
 		"${REVISION_UID}", string(rev.UID))
+}
+
+func (c *Reconciler) FinalizeKind(ctx context.Context, rev *v1.Revision) pkgreconciler.Event {
+	err := c.kubeclient.AppsV1().Deployments(rev.Namespace).Delete(resourcenames.Deployment(rev), &metav1.DeleteOptions{})
+	if err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("failed to delete deployment: %w", err)
+	}
+
+	// Forcefully remove all pods of the current revision.
+	if err := c.kubeclient.CoreV1().Pods(rev.Namespace).DeleteCollection(&metav1.DeleteOptions{
+		GracePeriodSeconds: ptr.Int64(0),
+	}, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", serving.RevisionUID, string(rev.UID)),
+	}); err != nil {
+		return fmt.Errorf("failed to forcefully remove pods: %w", err)
+	}
+
+	return nil
 }

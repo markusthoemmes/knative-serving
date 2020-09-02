@@ -22,7 +22,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods", "namespaces", "secrets", "configmaps", "endpoints", "services", "events", "serviceaccounts"]
-    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+    verbs: ["get", "list", "create", "update", "delete", "deletecollection", "patch", "watch"]
   - apiGroups: [""]
     resources: ["endpoints/restricted"] # Permission for RestrictedEndpointsAdmission
     verbs: ["create"]
