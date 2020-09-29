@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -157,7 +158,7 @@ func (c *Reconciler) getSortedCreatedRevisions(ctx context.Context, config *v1.C
 			// If the user deletes the LatestReadyRevision then this may return an error due to the
 			// dangling reference.  Proceed to calculate the next-latest ready revision so that the
 			// caller can synthesize a new Revision at the current generation to replace the one deleted.
-			logger.Errorf("Error getting latest ready revision %q: %v", config.Status.LatestReadyRevisionName, err)
+			logger.With(zap.Error(err)).Errorf("Error getting latest ready revision %q", config.Status.LatestReadyRevisionName)
 		} else {
 			start := lrr.Generation
 			var generations []string

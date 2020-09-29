@@ -168,7 +168,7 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				s.logger.Debug("Handler disconnected")
 			} else {
-				s.logger.Errorf("Handler exiting on error: %#v", err)
+				s.logger.Errorw("Handler exiting on error", zap.Error(err))
 			}
 			close(handlerCh)
 			return
