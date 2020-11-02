@@ -75,7 +75,8 @@ const (
 )
 
 func TestControllerCanReconcile(t *testing.T) {
-	ctx, cancel, infs := SetupFakeContextWithCancel(t)
+	ctx, cancel, _ := SetupFakeContextWithCancel(t)
+	defer cancel()
 	ctl := NewController(ctx, configmap.NewStaticWatcher(
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -94,15 +95,6 @@ func TestControllerCanReconcile(t *testing.T) {
 			},
 		}))
 
-	waitInformers, err := controller.RunInformers(ctx.Done(), infs...)
-	if err != nil {
-		t.Fatal("Failed to start informers:", err)
-	}
-	defer func() {
-		cancel()
-		waitInformers()
-	}()
-
 	podAutoscaler := pa(testNamespace, testRevision, WithHPAClass)
 	fakeservingclient.Get(ctx).AutoscalingV1alpha1().PodAutoscalers(testNamespace).Create(ctx, podAutoscaler, metav1.CreateOptions{})
 	fakepainformer.Get(ctx).Informer().GetIndexer().Add(podAutoscaler)
@@ -112,7 +104,7 @@ func TestControllerCanReconcile(t *testing.T) {
 		la.Promote(reconciler.UniversalBucket(), func(reconciler.Bucket, types.NamespacedName) {})
 	}
 
-	err = ctl.Reconciler.Reconcile(context.Background(), testNamespace+"/"+testRevision)
+	err := ctl.Reconciler.Reconcile(context.Background(), testNamespace+"/"+testRevision)
 	if err != nil {
 		t.Error("Reconcile() =", err)
 	}
