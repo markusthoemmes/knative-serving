@@ -35,6 +35,7 @@ import (
 
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/injection"
+	"knative.dev/pkg/logging"
 	logtesting "knative.dev/pkg/logging/testing"
 )
 
@@ -47,21 +48,16 @@ func SetupFakeContext(t zaptest.TestingT) (context.Context, []controller.Informe
 // SetupFakeContextWithCancel sets up the the Context and the fake informers for the tests
 // The provided context can be canceled using provided callback.
 func SetupFakeContextWithCancel(t zaptest.TestingT) (context.Context, context.CancelFunc, []controller.Informer) {
-	ctx, c := context.WithCancel(logtesting.TestContextWithLogger(t))
-	ctx = controller.WithEventRecorder(ctx, record.NewFakeRecorder(1000))
-	ctx, is := injection.Fake.SetupInformers(ctx, &rest.Config{})
+	ctx, c := context.WithCancel(context.Background())
+	ctx, is := EnableFakeContext(t, ctx)
 	return ctx, c, is
 }
 
-// SetupFakeCustomizedContextWithCancel sets up the the Context and the fake informers for the tests
-// The provided context can be canceled using provided callback.
-// The provided customizeCtxFunc() can be used to edit ctx before the SetupInformer steps
-func SetupFakeCustomizedContextWithCancel(t zaptest.TestingT, customizeCtxFunc func(context.Context) context.Context) (context.Context, context.CancelFunc, []controller.Informer) {
-        ctx, c := context.WithCancel(logtesting.TestContextWithLogger(t))
-        ctx = controller.WithEventRecorder(ctx, record.NewFakeRecorder(1000))
-        ctx = customizeCtxFunc(ctx)
-        ctx, is := injection.Fake.SetupInformers(ctx, &rest.Config{})
-        return ctx, c, is
+func EnableFakeContext(t zaptest.TestingT, ctx context.Context) (context.Context, []controller.Informer) {
+	ctx = logging.WithLogger(ctx, logtesting.TestLogger(t))
+	ctx = controller.WithEventRecorder(ctx, record.NewFakeRecorder(1000))
+	ctx, is := injection.Fake.SetupInformers(ctx, &rest.Config{})
+	return ctx, is
 }
 
 // fakeClient is an interface capturing the two functions we need from fake clients.

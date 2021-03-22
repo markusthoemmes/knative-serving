@@ -1207,9 +1207,9 @@ func deploy(namespace, name string, opts ...deploymentOption) *appsv1.Deployment
 }
 
 func TestGlobalResyncOnUpdateAutoscalerConfigMap(t *testing.T) {
-	ctx, cancel, informers := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, informers := EnableFakeContext(t, ctx)
 	watcher := &configmap.ManualWatcher{Namespace: system.Namespace()}
 
 	fakeDeciders := newTestDeciders()
@@ -1297,9 +1297,9 @@ func TestGlobalResyncOnUpdateAutoscalerConfigMap(t *testing.T) {
 }
 
 func TestReconcileDeciderCreatesAndDeletes(t *testing.T) {
-	ctx, cancel, informers := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, informers := EnableFakeContext(t, ctx)
 	fakeDeciders := newTestDeciders()
 	ctl := NewController(ctx, newConfigWatcher(), fakeDeciders)
 
@@ -1370,9 +1370,9 @@ func TestReconcileDeciderCreatesAndDeletes(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	ctx, cancel, _ := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, _ = EnableFakeContext(t, ctx)
 	t.Cleanup(cancel)
 
 	fakeDeciders := newTestDeciders()
@@ -1447,9 +1447,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestControllerCreateError(t *testing.T) {
-	ctx, cancel, infs := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, infs := EnableFakeContext(t, ctx)
 	waitInformers, err := RunAndSyncInformers(ctx, infs...)
 	if err != nil {
 		t.Fatal("Error starting up informers:", err)
@@ -1490,9 +1490,9 @@ func TestControllerCreateError(t *testing.T) {
 }
 
 func TestControllerUpdateError(t *testing.T) {
-	ctx, cancel, infs := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, infs := EnableFakeContext(t, ctx)
 	waitInformers, err := RunAndSyncInformers(ctx, infs...)
 	if err != nil {
 		t.Fatal("Error starting up informers:", err)
@@ -1533,9 +1533,9 @@ func TestControllerUpdateError(t *testing.T) {
 }
 
 func TestControllerGetError(t *testing.T) {
-	ctx, cancel, infs := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, infs := EnableFakeContext(t, ctx)
 	waitInformers, err := RunAndSyncInformers(ctx, infs...)
 	if err != nil {
 		t.Fatal("Error starting up informers:", err)
@@ -1575,9 +1575,9 @@ func TestControllerGetError(t *testing.T) {
 }
 
 func TestScaleFailure(t *testing.T) {
-	ctx, cancel, infs := SetupFakeCustomizedContextWithCancel(t, func(ctx context.Context) context.Context {
-		return filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
-	})
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = filteredinformerfactory.WithSelectors(ctx, serving.RevisionUID)
+	ctx, infs := EnableFakeContext(t, ctx)
 	waitInformers, err := RunAndSyncInformers(ctx, infs...)
 	if err != nil {
 		t.Fatal("Error starting up informers:", err)
