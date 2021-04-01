@@ -17,12 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
 
-	"knative.dev/serving/test"
+	"knative.dev/serving/cmd/queue"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -31,8 +30,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	flag.Parse()
 	log.Print("Hello world app started.")
 
-	test.ListenAndServeGracefully(":8080", handler)
+	queue.Main(http.HandlerFunc(handler))
 }

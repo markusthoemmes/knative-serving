@@ -172,7 +172,7 @@ func fractionFromPercentage(m map[string]string, k string) (float64, bool) {
 	return value / 100, err == nil
 }
 
-func makeStartupExecProbe(in *corev1.Probe, progressDeadline time.Duration) *corev1.Probe {
+func makeStartupExecProbe(in *corev1.Probe, progressDeadline time.Duration, binary string) *corev1.Probe {
 	if in != nil && in.PeriodSeconds > 0 {
 		// If the user opted-out of the aggressive probing optimisation we don't
 		// need to run a startup probe at all.
@@ -186,7 +186,9 @@ func makeStartupExecProbe(in *corev1.Probe, progressDeadline time.Duration) *cor
 				// and restarted if it fails. We use the ProgressDeadline as the timeout
 				// to match the time we'll wait before killing the revision if it
 				// fails to go ready on initial deployment.
-				Command: []string{"/ko-app/queue", "-probe-timeout", progressDeadline.String()},
+
+				// TODO(markusthoemmes): This needs to be more dynamic.
+				Command: []string{binary, "-probe-timeout", progressDeadline.String()},
 			},
 		},
 		// The exec probe itself retries aggressively so there's no point retrying via Kubernetes too.
@@ -204,7 +206,7 @@ func makeStartupExecProbe(in *corev1.Probe, progressDeadline time.Duration) *cor
 }
 
 // makeQueueContainer creates the container spec for the queue sidecar.
-func makeQueueContainer(rev *v1.Revision, cfg *config.Config) (*corev1.Container, error) {
+func makeQueueContainer(rev *v1.Revision, cfg *config.Config, isInternalQP bool) (*corev1.Container, error) {
 	configName := ""
 	if owner := metav1.GetControllerOf(rev); owner != nil && owner.Kind == "Configuration" {
 		configName = owner.Name
@@ -242,7 +244,12 @@ func makeQueueContainer(rev *v1.Revision, cfg *config.Config) (*corev1.Container
 	// variable for this probe to use.
 	userProbe := container.ReadinessProbe.DeepCopy()
 	applyReadinessProbeDefaultsForExec(userProbe, userPort)
-	execProbe := makeStartupExecProbe(userProbe, cfg.Deployment.ProgressDeadline)
+
+	binary := "/ko-app/main"
+	if anno := rev.Annotations["service.knative.dev/qpbinary"]; anno != "" {
+		binary = anno
+	}
+	execProbe := makeStartupExecProbe(userProbe, cfg.Deployment.ProgressDeadline, binary)
 	userProbeJSON, err := readiness.EncodeProbe(userProbe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize readiness probe: %w", err)
@@ -270,9 +277,14 @@ func makeQueueContainer(rev *v1.Revision, cfg *config.Config) (*corev1.Container
 		httpProbe.PeriodSeconds = 1
 	}
 
+	image := cfg.Deployment.QueueSidecarImage
+	if isInternalQP {
+		image = rev.Spec.GetContainer().Image
+	}
+
 	c := &corev1.Container{
 		Name:            QueueContainerName,
-		Image:           cfg.Deployment.QueueSidecarImage,
+		Image:           image,
 		Resources:       createQueueResources(cfg.Deployment, rev.GetAnnotations(), container),
 		Ports:           ports,
 		StartupProbe:    execProbe,

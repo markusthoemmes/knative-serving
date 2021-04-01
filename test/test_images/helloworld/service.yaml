@@ -5,6 +5,10 @@ metadata:
   namespace: default
 spec:
   template:
+    metadata:
+      annotations:
+        service.knative.dev/internalqp: "true"
+        service.knative.dev/qpbinary: "/ko-app/helloworld"
     spec:
       containers:
       - image: ko://knative.dev/serving/test/test_images/helloworld

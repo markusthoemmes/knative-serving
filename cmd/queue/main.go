@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package queue
 
 import (
 	"context"
@@ -33,6 +33,7 @@ import (
 	"go.uber.org/zap"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	network "knative.dev/networking/pkg"
 	pkglogging "knative.dev/pkg/logging"
@@ -104,7 +105,7 @@ func init() {
 	maxprocs.Set()
 }
 
-func main() {
+func Main(appHandler http.Handler) {
 	flag.Parse()
 
 	// If this is set, we run as a standalone binary to probe the queue-proxy.
@@ -166,10 +167,10 @@ func main() {
 	}()
 
 	// Setup probe to run for checking user-application healthiness.
-	probe := buildProbe(logger, env)
+	probe := buildProbe(logger, env, appHandler != nil)
 	healthState := health.NewState()
 
-	mainServer := buildServer(ctx, env, healthState, probe, stats, logger)
+	mainServer := buildServer(ctx, env, healthState, probe, stats, logger, appHandler)
 	servers := map[string]*http.Server{
 		"main":    mainServer,
 		"admin":   buildAdminServer(logger, healthState),
@@ -255,11 +256,22 @@ func main() {
 	}
 }
 
-func buildProbe(logger *zap.SugaredLogger, env config) *readiness.Probe {
+func buildProbe(logger *zap.SugaredLogger, env config, isInternalized bool) *readiness.Probe {
 	coreProbe, err := readiness.DecodeProbe(env.ServingReadinessProbe)
 	if err != nil {
 		logger.Fatalw("Queue container failed to parse readiness probe", zap.Error(err))
 	}
+
+	if isInternalized {
+		// TODO: This is a total strawman. We actually should route the request internally.
+		if coreProbe.HTTPGet != nil {
+			coreProbe.HTTPGet.Port = intstr.FromString(env.QueueServingPort)
+		}
+		if coreProbe.TCPSocket != nil {
+			coreProbe.TCPSocket.Port = intstr.FromString(env.QueueServingPort)
+		}
+	}
+
 	if env.EnableHTTP2AutoDetection {
 		return readiness.NewProbeWithHTTP2AutoDetection(coreProbe)
 	}
@@ -267,20 +279,22 @@ func buildProbe(logger *zap.SugaredLogger, env config) *readiness.Probe {
 }
 
 func buildServer(ctx context.Context, env config, healthState *health.State, rp *readiness.Probe, stats *network.RequestStats,
-	logger *zap.SugaredLogger) *http.Server {
+	logger *zap.SugaredLogger, appHandler http.Handler) *http.Server {
 
 	maxIdleConns := 1000 // TODO: somewhat arbitrary value for CC=0, needs experimental validation.
 	if env.ContainerConcurrency > 0 {
 		maxIdleConns = env.ContainerConcurrency
 	}
 
-	target := net.JoinHostPort("127.0.0.1", env.UserPort)
-
-	httpProxy := pkghttp.NewHeaderPruningReverseProxy(target, pkghttp.NoHostOverride, activator.RevisionHeaders)
-	httpProxy.Transport = buildTransport(env, logger, maxIdleConns)
-	httpProxy.ErrorHandler = pkgnet.ErrorHandler(logger)
-	httpProxy.BufferPool = network.NewBufferPool()
-	httpProxy.FlushInterval = network.FlushInterval
+	if appHandler == nil {
+		target := net.JoinHostPort("127.0.0.1", env.UserPort)
+		httpProxy := pkghttp.NewHeaderPruningReverseProxy(target, pkghttp.NoHostOverride, activator.RevisionHeaders)
+		httpProxy.Transport = buildTransport(env, logger, maxIdleConns)
+		httpProxy.ErrorHandler = pkgnet.ErrorHandler(logger)
+		httpProxy.BufferPool = network.NewBufferPool()
+		httpProxy.FlushInterval = network.FlushInterval
+		appHandler = httpProxy
+	}
 
 	breaker := buildBreaker(logger, env)
 	metricsSupported := supportsMetrics(ctx, logger, env)
@@ -289,7 +303,7 @@ func buildServer(ctx context.Context, env config, healthState *health.State, rp 
 
 	// Create queue handler chain.
 	// Note: innermost handlers are specified first, ie. the last handler in the chain will be executed first.
-	var composedHandler http.Handler = httpProxy
+	var composedHandler http.Handler = appHandler
 	if metricsSupported {
 		composedHandler = requestAppMetricsHandler(logger, composedHandler, breaker, env)
 	}

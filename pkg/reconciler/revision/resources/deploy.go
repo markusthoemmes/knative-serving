@@ -87,13 +87,20 @@ func rewriteUserProbe(p *corev1.Probe, userPort int) {
 }
 
 func makePodSpec(rev *v1.Revision, cfg *config.Config) (*corev1.PodSpec, error) {
-	queueContainer, err := makeQueueContainer(rev, cfg)
+	isInternalQP := rev.Annotations["service.knative.dev/internalqp"] == "true"
+
+	queueContainer, err := makeQueueContainer(rev, cfg, isInternalQP)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue-proxy container: %w", err)
 	}
 
-	podSpec := BuildPodSpec(rev, append(BuildUserContainers(rev), *queueContainer), cfg)
+	var podSpec *corev1.PodSpec
+	if isInternalQP {
+		podSpec = BuildPodSpec(rev, []corev1.Container{*queueContainer}, cfg)
+	} else {
+		podSpec = BuildPodSpec(rev, append(BuildUserContainers(rev), *queueContainer), cfg)
+	}
 
 	if cfg.Observability.EnableVarLogCollection {
 		podSpec.Volumes = append(podSpec.Volumes, varLogVolume)
