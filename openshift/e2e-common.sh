@@ -256,7 +256,7 @@ function create_configmaps(){
   sed -i -e 's/value: \"kourier-system\"/value: \"knative-serving-ingress\"/g' third_party/kourier-latest/kourier.yaml || return $?
 
   # Create configmap to use the latest kourier.
-  sed -i -e 's/net-kourier-controller.knative-serving/net-kourier-controller.knative-serving-ingress/g' third_party/kourier-latest/kourier.yaml || return $?
+  sed -i -e 's/kourier-control.knative-serving/kourier-control.knative-serving-ingress/g' third_party/kourier-latest/kourier.yaml || return $?
   oc create configmap kourier-cm -n $OPERATORS_NAMESPACE --from-file="third_party/kourier-latest/kourier.yaml" || return $?
 }
 
