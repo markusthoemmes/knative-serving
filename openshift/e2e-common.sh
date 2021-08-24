@@ -15,6 +15,7 @@ readonly OLM_NAMESPACE="openshift-marketplace"
 if [ -n "$OPENSHIFT_BUILD_NAMESPACE" ]; then
   TEST_IMAGE_TEMPLATE=$(cat <<-END
 {{- with .Name }}
+{{- if eq . "emptydir"}}$KNATIVE_SERVING_TEST_EMPTYDIR{{end -}}
 {{- if eq . "readiness"}}$KNATIVE_SERVING_TEST_READINESS{{end -}}
 {{- if eq . "pizzaplanetv1"}}$KNATIVE_SERVING_TEST_PIZZAPLANETV1{{end -}}
 {{- if eq . "pizzaplanetv2"}}$KNATIVE_SERVING_TEST_PIZZAPLANETV2{{end -}}
@@ -358,7 +359,15 @@ function run_e2e_tests(){
     --resolvabledomain || failed=1
   oc -n ${SYSTEM_NAMESPACE} patch knativeserving/knative-serving --type=merge --patch='{"spec": {"config": { "features": {"responsive-revision-gc": "disabled"}}}}' || fail_test
 
- # Run the helloworld test with an image pulled into the internal registry.
+  oc -n ${SYSTEM_NAMESPACE} patch knativeserving/knative-serving --type=merge --patch='{"spec": {"config": { "features": {"kubernetes.podspec-volumes-emptydir": "enabled"}}}}' || fail_test
+  go_test_e2e -tags=emptydir -timeout=2m ./test/e2e \
+    --kubeconfig "$KUBECONFIG" \
+    --imagetemplate "$TEST_IMAGE_TEMPLATE" \
+    --enable-alpha \
+    --resolvabledomain || failed=1
+  oc -n ${SYSTEM_NAMESPACE} patch knativeserving/knative-serving --type=merge --patch='{"spec": {"config": { "features": {"kubernetes.podspec-volumes-emptydir": "disabled"}}}}' || fail_test
+
+  # Run the helloworld test with an image pulled into the internal registry.
   local image_to_tag=$KNATIVE_SERVING_TEST_HELLOWORLD
   oc tag -n serving-tests "$image_to_tag" "helloworld:latest" --reference-policy=local
   go_test_e2e -tags=e2e -timeout=30m ./test/e2e -run "^(TestHelloWorld)$" \
