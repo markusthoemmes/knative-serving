@@ -18,7 +18,7 @@ kind: Namespace
 metadata:
   name: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 ---
@@ -44,7 +44,7 @@ metadata:
   # (which should be identical, but isn't guaranteed to be installed alongside serving).
   name: knative-serving-aggregated-addressable-resolver
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 aggregationRule:
@@ -58,7 +58,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: knative-serving-addressable-resolver
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     # Labeled to facilitate aggregated cluster roles that act on Addressables.
     duck.knative.dev/addressable: "true"
     app.kubernetes.io/version: devel
@@ -98,7 +98,7 @@ metadata:
   name: knative-serving-namespaced-admin
   labels:
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 rules:
@@ -115,7 +115,7 @@ metadata:
   name: knative-serving-namespaced-edit
   labels:
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 rules:
@@ -132,7 +132,7 @@ metadata:
   name: knative-serving-namespaced-view
   labels:
     rbac.authorization.k8s.io/aggregate-to-view: "true"
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 rules:
@@ -159,7 +159,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: knative-serving-core
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     serving.knative.dev/controller: "true"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -214,7 +214,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: knative-serving-podspecable-binding
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     # Labeled to facilitate aggregated cluster roles that act on PodSpecables.
     duck.knative.dev/podspecable: "true"
     app.kubernetes.io/version: devel
@@ -252,7 +252,7 @@ metadata:
   name: controller
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: controller
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -262,7 +262,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: knative-serving-admin
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
 aggregationRule:
@@ -276,7 +276,7 @@ kind: ClusterRoleBinding
 metadata:
   name: knative-serving-controller-admin
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: controller
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -294,7 +294,7 @@ kind: ClusterRoleBinding
 metadata:
   name: knative-serving-controller-addressable-resolver
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: controller
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -377,7 +377,7 @@ kind: CustomResourceDefinition
 metadata:
   name: certificates.networking.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: networking.internal.knative.dev
@@ -434,7 +434,7 @@ kind: CustomResourceDefinition
 metadata:
   name: configurations.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
     duck.knative.dev/podspecable: "true"
 spec:
@@ -1135,7 +1135,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clusterdomainclaims.networking.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: networking.internal.knative.dev
@@ -1183,7 +1183,7 @@ kind: CustomResourceDefinition
 metadata:
   name: domainmappings.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: serving.knative.dev
@@ -1451,7 +1451,7 @@ kind: CustomResourceDefinition
 metadata:
   name: ingresses.networking.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: networking.internal.knative.dev
@@ -1509,7 +1509,7 @@ kind: CustomResourceDefinition
 metadata:
   name: metrics.autoscaling.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: autoscaling.internal.knative.dev
@@ -1630,7 +1630,7 @@ kind: CustomResourceDefinition
 metadata:
   name: podautoscalers.autoscaling.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: autoscaling.internal.knative.dev
@@ -1788,7 +1788,7 @@ kind: CustomResourceDefinition
 metadata:
   name: revisions.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: serving.knative.dev
@@ -2489,7 +2489,7 @@ kind: CustomResourceDefinition
 metadata:
   name: routes.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
     duck.knative.dev/addressable: "true"
 spec:
@@ -2661,7 +2661,7 @@ kind: CustomResourceDefinition
 metadata:
   name: serverlessservices.networking.internal.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
 spec:
   group: networking.internal.knative.dev
@@ -2730,7 +2730,7 @@ kind: CustomResourceDefinition
 metadata:
   name: services.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     knative.dev/crd-install: "true"
     duck.knative.dev/addressable: "true"
     duck.knative.dev/podspecable: "true"
@@ -3497,7 +3497,7 @@ metadata:
   name: queue-proxy
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: queue-proxy
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -3526,7 +3526,7 @@ metadata:
   name: config-autoscaler
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: autoscaler
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -3733,7 +3733,7 @@ metadata:
   name: config-defaults
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -3868,7 +3868,7 @@ metadata:
   name: config-deployment
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -3956,7 +3956,7 @@ metadata:
   name: config-domain
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4020,7 +4020,7 @@ metadata:
   name: config-features
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4167,7 +4167,7 @@ metadata:
   name: config-gc
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4266,7 +4266,7 @@ metadata:
   name: config-leader-election
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4327,7 +4327,7 @@ metadata:
   name: config-logging
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4406,7 +4406,7 @@ metadata:
   name: config-network
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
   annotations:
     knative.dev/example-checksum: "d38faef1"
 data:
@@ -4547,7 +4547,7 @@ metadata:
   name: config-observability
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4655,7 +4655,7 @@ metadata:
   name: config-tracing
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
   annotations:
@@ -4711,7 +4711,7 @@ metadata:
   name: activator
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: activator
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -4740,7 +4740,7 @@ metadata:
   name: activator-pdb
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: activator
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -4770,7 +4770,7 @@ metadata:
   name: activator
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: activator
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -4786,7 +4786,7 @@ spec:
       labels:
         app: activator
         role: activator
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
         app.kubernetes.io/name: activator
         app.kubernetes.io/part-of: knative-serving
         app.kubernetes.io/version: devel
@@ -4883,7 +4883,7 @@ metadata:
   namespace: knative-serving
   labels:
     app: activator
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: activator
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -4926,7 +4926,7 @@ metadata:
   name: autoscaler
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: autoscaler
     app.kubernetes.io/part-of: knative-serving
     app.kubernetes.io/version: devel
@@ -4941,7 +4941,7 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
       labels:
         app: autoscaler
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
         app.kubernetes.io/name: autoscaler
         app.kubernetes.io/part-of: knative-serving
         app.kubernetes.io/version: devel
@@ -5029,7 +5029,7 @@ kind: Service
 metadata:
   labels:
     app: autoscaler
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: autoscaler
     app.kubernetes.io/part-of: knative-serving
     app.kubernetes.io/version: devel
@@ -5070,7 +5070,7 @@ metadata:
   name: controller
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: controller
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5084,7 +5084,7 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
       labels:
         app: controller
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
         app.kubernetes.io/name: controller
         app.kubernetes.io/version: devel
         app.kubernetes.io/part-of: knative-serving
@@ -5153,7 +5153,7 @@ kind: Service
 metadata:
   labels:
     app: controller
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: controller
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5191,7 +5191,7 @@ metadata:
   name: domain-mapping
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: domain-mapping
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5205,7 +5205,7 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
       labels:
         app: domain-mapping
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
         app.kubernetes.io/name: domain-mapping
         app.kubernetes.io/part-of: knative-serving
         app.kubernetes.io/version: devel
@@ -5284,7 +5284,7 @@ metadata:
   name: domainmapping-webhook
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: domainmapping-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5303,7 +5303,7 @@ spec:
         app.kubernetes.io/part-of: knative-serving
         app.kubernetes.io/version: devel
         role: domainmapping-webhook
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
     spec:
       # To avoid node becoming SPOF, spread our replicas to different nodes.
       affinity:
@@ -5396,7 +5396,7 @@ kind: Service
 metadata:
   labels:
     role: domainmapping-webhook
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: domainmapping-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5437,7 +5437,7 @@ metadata:
   name: webhook
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5464,7 +5464,7 @@ metadata:
   name: webhook-pdb
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5494,7 +5494,7 @@ metadata:
   name: webhook
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5510,7 +5510,7 @@ spec:
       labels:
         app: webhook
         role: webhook
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
         app.kubernetes.io/name: webhook
         app.kubernetes.io/version: devel
         app.kubernetes.io/part-of: knative-serving
@@ -5608,7 +5608,7 @@ kind: Service
 metadata:
   labels:
     role: webhook
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5648,7 +5648,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: config.webhook.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: configmap-validation-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5686,7 +5686,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: webhook.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: defaulting-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5741,7 +5741,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: webhook.domainmapping.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
 webhooks:
 - admissionReviewVersions: ["v1", "v1beta1"]
   clientConfig:
@@ -5785,7 +5785,7 @@ metadata:
   name: domainmapping-webhook-certs
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
 # The data is populated at install time.
 ---
 # Copyright 2020 The Knative Authors
@@ -5807,7 +5807,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: validation.webhook.domainmapping.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: domainmapping-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5854,7 +5854,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: validation.webhook.serving.knative.dev
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: validating-webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5911,7 +5911,7 @@ metadata:
   name: webhook-certs
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     app.kubernetes.io/name: webhook
     app.kubernetes.io/version: devel
     app.kubernetes.io/part-of: knative-serving
@@ -5937,7 +5937,7 @@ metadata:
   name: autoscaler-hpa
   namespace: knative-serving
   labels:
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
     autoscaling.knative.dev/autoscaler-provider: hpa
     app.kubernetes.io/name: autoscaler-hpa
     app.kubernetes.io/part-of: knative-serving
@@ -5952,7 +5952,7 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
       labels:
         app: autoscaler-hpa
-        serving.knative.dev/release: "v0.23.0"
+        serving.knative.dev/release: "v0.24.0"
     spec:
       # To avoid node becoming SPOF, spread our replicas to different nodes.
       affinity:
@@ -6018,7 +6018,7 @@ metadata:
     app.kubernetes.io/part-of: knative-serving
     app.kubernetes.io/version: devel
     autoscaling.knative.dev/autoscaler-provider: hpa
-    serving.knative.dev/release: "v0.23.0"
+    serving.knative.dev/release: "v0.24.0"
   name: autoscaler-hpa
   namespace: knative-serving
 spec:
