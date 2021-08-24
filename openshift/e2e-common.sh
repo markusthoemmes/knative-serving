@@ -217,6 +217,9 @@ metadata:
   name: knative-serving
   namespace: ${SERVING_NAMESPACE}
 spec:
+  ingress:
+    kourier:
+      service-type: "LoadBalancer" # To enable gRPC and HTTP2 tests.
   config:
     deployment:
       progressDeadline: "120s"
