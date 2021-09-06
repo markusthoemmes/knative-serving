@@ -17,8 +17,16 @@ func isUnknownAuthority(err error) bool {
 // - 503 to account for Openshift route inconsistency (https://jira.coreos.com/browse/SRVKS-157)
 func RouteInconsistencyRetryChecker() ResponseRetryChecker {
 	const neededSuccesses = 5
-	var successes int
+	var (
+		successes int
+		passed    bool
+	)
 	return func(resp *Response) (bool, error) {
+		if passed {
+			// If we've already had 5 successes, stop retrying these issues.
+			return false, nil
+		}
+
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusServiceUnavailable {
 			successes = 0
 			return true, fmt.Errorf("retrying route inconsistency request: %s", resp)
@@ -27,6 +35,8 @@ func RouteInconsistencyRetryChecker() ResponseRetryChecker {
 		if successes < neededSuccesses {
 			return true, fmt.Errorf("retrying to reach success confidence: successful %d, want at least %d", successes, neededSuccesses)
 		}
+
+		passed = true
 		return false, nil
 	}
 }
