@@ -167,11 +167,11 @@ func (sc *SpoofingClient) Poll(req *http.Request, inState ResponseChecker, check
 		checkers = []interface{}{ErrorRetryChecker(DefaultErrorRetryChecker), RouteInconsistencyRetryChecker()}
 	}
 
+	traceContext, span := trace.StartSpan(req.Context(), "SpoofingClient-Trace")
+	defer span.End()
+
 	var resp *Response
 	err := wait.PollImmediate(sc.RequestInterval, sc.RequestTimeout, func() (bool, error) {
-		// Starting span to capture zipkin trace.
-		traceContext, span := trace.StartSpan(req.Context(), "SpoofingClient-Trace")
-		defer span.End()
 		rawResp, err := sc.Client.Do(req.WithContext(traceContext))
 		if err != nil {
 			for _, checker := range checkers {
