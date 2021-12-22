@@ -3,132 +3,104 @@ aliases:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   serving-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   serving-api-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   serving-api-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   autoscaling-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   autoscaling-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   monitoring-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   monitoring-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   productivity-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   productivity-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   networking-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   networking-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
   build-approvers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
   build-reviewers:
   - alanfx
   - mgencur
   - mvinkler
-  - jcrossley3
-  - bobmcwhirter
-  - evanchooly
-  - arilivigni
+  - nak3
+  - rhuss
   - skonto
 
